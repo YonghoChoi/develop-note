@@ -1,0 +1,206 @@
+# Docker
+
+## Command
+
+* run : 이미지를 컨테이너로 실행한 뒤 명령 수행
+
+  ```shell
+  docker run <옵션> <이미지 이름> <실행할 파일>
+  ```
+
+  ```shell
+  # -i : interactive, -t : Pseudo-tty
+  # ubuntu 이미지를 test라는 이름의 컨테이너로 생성한 뒤 ubuntu 이미지 안의 /bin/bash를 실행.
+  docker run -it --name test ubuntu /bin/bash
+  ```
+
+  ```shell
+  # -d : background run, -p : port forwarding
+  docker run -d -p 8080:8080 tomcat
+  ```
+
+* attach : 해당 이름의 docker 컨테이너로 접속
+
+  ```shell
+  docker attach CONTAINER_ID
+  ```
+
+
+
+* logs : docker 컨테이너의 로그 출력
+
+
+* 톰캣 이미지를 백그라운드에서 수행 후 logs 명령으로 로그를 확인할 수 있다.
+
+```shell
+  # -f : polling
+  docker logs -t CONTAINER_ID
+```
+
+* exec : docker 컨테이너에서 명령 수행
+
+
+* 톰캣 이미지를 받아 실행하면 바로 실행되며 로그가 출력 되는데 exec 명령을 수행하여 docker 컨테이너에 접속해서 설정을 편집할 수 있다.
+
+```shell
+  # interactive 가능한 tty로 /bin/bash 수행
+  docker exec -it CONTAINER_ID /bin/bash
+```
+
+* restart : 해당 이름의 docker 컨테이너 재시작
+
+  ```shell
+  docker restart <이름>
+  ```
+
+
+
+* start/stop : docker 컨테이너 시작/중지
+
+* build : 지정된 경로의 Dockerfile 기반으로 이미지 생성.
+
+  ```shell
+  docker build <옵션> <Dockerfile 경로>
+  ```
+
+  ```shell
+  docker build --tage hello:0.1 .
+  ```
+
+* docker ps
+
+
+  * -q : container의 ID만 출력
+
+  * 현재 떠 있는 모든 컨테이너 stop 시키기
+
+    ```shell
+    $ docker stop $(docker ps -q)
+    ```
+
+  * 종료한 컨테이너들 제거
+
+    ```shell
+    $ docker rm $(docker ps --filter=status=exited --filter=status=create -q)
+    ```
+
+  * 쓰이지 않는 이미지들(dangling) 제거
+
+    ```shell
+    $ docker rmi $(docker images -a --filter=dangling=true -q)
+    ```
+
+  * 모든 이미지 제거
+
+    ```shell
+    $ docker rmi $(docker images -a -q)
+    ```
+
+    ​
+
+
+## Dockerfile
+
+
+* EXPOSE : 외부에서 연결할 수 있도록 port 오픈
+
+  ```shell
+  EXPOSE 3306
+  ```
+
+* Dockerfile을 수정한 후에는 반드시 docker build 명령을 수행하여 변경된 내용을 빌드한후 run 해야 적용된다.
+
+
+
+
+### Docker 이미지 Dockerhub에 push 하기
+
+먼저 http://hub.docker.com 에 계정이 생성되어 있어야 하고, push 할 저장소가 생성되어야 한다. 저장소는 hub.docker.com 페이지에서 로그인 후 간단하게 생성가능하다. 
+
+push를 하기 위해서는 로컬에서 docker로 로그인이 되어 있어야 하는데 docker login 명령으로 login을 할 수 있다. 이 후 docker tag 명령으로 저장소와 같은 이름으로 push할 이미지를 tag하고 push를 수행하면 끝. 
+
+
+
+요약하면
+
+1. http://hub.docker.com 로그인 후 저장소 생성
+
+2. 로컬에서 docker에 로그인
+
+   ```shell
+   $ docker login
+   ```
+
+3. tag 명령으로 이미지명을 저장소 명과 동일하게 맞춤.
+
+   ```shell
+   $ docker tag <image 명> <저장소경로>
+   ```
+
+4. push 수행
+
+   ```shell
+   $ docker push <tag명>
+   ```
+
+
+
+*여기서 내가 원했던 것은 작업하던 이미지를 그대로 docker hub에 올려두고 다른데서 작업을 이어가길 원했는데 image가 처음 구동 되었을 때 환경으로 업로드가 되었다. 작업하던 환경 그대로 올릴 수 있는 방법을 찾아봐야 할듯!*
+
+
+
+## 개발환경 셋팅
+
+### jenkins
+
+젠킨스를 docker 이미지로 받아 실행하면 보안상의 이슈로 인하여 root 계정을 사용하지 못하고 jenkins 계정만 사용이 가능하다. 그래서 apt 명령을 수행하지 못하므로 설치해야할 프로그램이 있는 경우 Dockerfile을 이용하여 이미지가 만들어지는 과정에서 설치를 수행해야 한다.
+
+* Dockerfile
+
+  ```
+
+  ```
+
+  ​
+
+### mariadb
+
+* 설치
+
+  - software-properties-common 버전 : 0.92.37.1
+  - mariadb-server 버전 : 10.0.13
+
+  ```shell
+  apt-get install software-properties-common
+  apt-key adv --recv-keys --keyserver hkp://keyserver.ubuntu.com:80 0xcbcb082a1bb943db
+  add-apt-repository 'deb http://ftp.kaist.ac.kr/mariadb/repo/10.0/ubuntu trusty main'
+  apt-get update
+  apt-get install mariadb-server
+  ```
+
+* /etc/apt/sources.list 파일 수정
+
+  ```shell
+  # MariaDB 10.0 repository list - created 2014-08-13 02:43 UTC
+  # http://mariadb.org/mariadb/repositories/
+  deb http://ftp.kaist.ac.kr/mariadb/repo/10.0/ubuntu trusty main
+  deb-src http://ftp.kaist.ac.kr/mariadb/repo/10.0/ubuntu trusty main
+  ```
+
+* my.cnf 변경(encoding)
+
+  ```shell
+  [client]
+  default-character-set=utf8
+
+  [mysqld]
+  init_connect="SET collation_connection=utf8_general_ci" 
+  init_connect="SET NAMES utf8" 
+  character-set-server=utf8
+  collation-server=utf8_general_ci
+
+  [mysql]
+  default-character-set=utf8
+  ```
+
+  ​
