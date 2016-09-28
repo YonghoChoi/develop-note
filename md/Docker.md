@@ -158,3 +158,5 @@ push를 하기 위해서는 로컬에서 docker로 로그인이 되어 있어야
 젠킨스를 docker 이미지로 받아 실행하면 보안상의 이슈로 인하여 root 계정을 사용하지 못하고 jenkins 계정만 사용이 가능하다. 그래서 apt 명령을 수행하지 못하므로 설치해야할 프로그램이 있는 경우 Dockerfile을 이용하여 이미지가 만들어지는 과정에서 설치를 수행해야 한다.
 
 jenkins 설정을 한 후 item을 생성하여 작업을 한 후 docker commit 명령으로 변경된 내용으로 새로운 이미지를 만든 후 다시 docker run을 해보면 내용이 남지 않고 초기화 된다. 그 이유는 jenkins Dockerfile을 살펴보면 알 수가 있는데 /var/jenkins_home 디렉토리가 VOLUME으로 지정되어 있어서 컨테이너에 저장되지 않고 로컬에 저장되기 때문이다. 
+
+Dockerfile에 VOLUE으로 지정했는데 docker run 시 -v 옵션으로 로컬 경로와 매핑을 해주지 않는 경우 호스트의 "/var/lib/jenkins/volumes/MOUNT_NAME/_data" 경로가 docker 내 볼륨과 매핑이 된다.(docker inspect 명령을 통해 경로 확인 가능)
