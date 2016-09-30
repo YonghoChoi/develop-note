@@ -66,7 +66,11 @@
   ```shell
   docker build --tage hello:0.1 .
   ```
-  
+
+* commit : 컨테이너에 변경된 내용을 이미지에 반영. (새로운 이미지가 생성됨)
+  * 기본적으로 pull을 해서 사용하는 도커 이미지에 사용자가 커스터마이징을 하려면 먼저 이미지를 통해 컨테이너를 실행 시키고 해당 컨테이너에 각종 설정을 수행한 후 docker commit 명령을 이용하여 svn이나 git을 사용하듯이 변경 된 내용을 해당 이미지에 적용할 수 있다. 
+  * 적용된 이미지를 docker hub에 올려 공유한다면 어디서든 같은 환경의 서버를 구축할 수 있게된다.
+
 
 ## ps 및 images 제거
 
@@ -172,19 +176,12 @@ push를 하기 위해서는 로컬에서 docker로 로그인이 되어 있어야
    ```
 
 
-
-### 이미지의 설정 커스터마이징
-
-기본적으로 pull을 해서 사용하는 도커 이미지에 사용자가 커스터마이징을 하려면 먼저 이미지를 통해 컨테이너를 실행 시키고 해당 컨테이너에 각종 설정을 수행한 후 docker commit 명령을 이용하여 svn이나 git을 사용하듯이 변경 된 내용을 해당 이미지에 적용할 수 있다. 
-적용된 이미지를 docker hub에 올려 공유한다면 어디서든 같은 환경의 서버를 구축할 수 있게된다.
-
-
 ## 개발환경 셋팅
 
 ### jenkins
 
-젠킨스를 docker 이미지로 받아 실행하면 보안상의 이슈로 인하여 root 계정을 사용하지 못하고 jenkins 계정만 사용이 가능하다. 그래서 apt 명령을 수행하지 못하므로 설치해야할 프로그램이 있는 경우 Dockerfile을 이용하여 이미지가 만들어지는 과정에서 설치를 수행해야 한다.
+* 젠킨스를 docker 이미지로 받아 실행하면 보안상의 이슈로 인하여 root 계정을 사용하지 못하고 jenkins 계정만 사용이 가능하도록 Dockerfile에 설정되어 있다. 그래서 apt 명령을 수행하지 못하므로 설치해야할 프로그램이 있는 경우 Dockerfile을 이용하여 이미지가 만들어지는 과정에서 설치를 수행해야 한다.
 
-jenkins 설정을 한 후 item을 생성하여 작업을 한 후 docker commit 명령으로 변경된 내용으로 새로운 이미지를 만든 후 다시 docker run을 해보면 내용이 남지 않고 초기화 된다. 그 이유는 jenkins Dockerfile을 살펴보면 알 수가 있는데 /var/jenkins_home 디렉토리가 VOLUME으로 지정되어 있어서 컨테이너에 저장되지 않고 로컬에 저장되기 때문이다. 
+* jenkins 설정을 한 후 item을 생성하여 작업을 한 후 docker commit 명령으로 변경된 내용으로 새로운 이미지를 만든 후 다시 docker run을 해보면 내용이 남지 않고 초기화 된다. 그 이유는 jenkins Dockerfile을 살펴보면 알 수가 있는데 /var/jenkins_home 디렉토리가 VOLUME으로 지정되어 있어서 컨테이너에 저장되지 않고 로컬에 저장되기 때문이다. 
 
-Dockerfile에 VOLUE으로 지정했는데 docker run 시 -v 옵션으로 로컬 경로와 매핑을 해주지 않는 경우 호스트의 "/var/lib/jenkins/volumes/MOUNT_NAME/_data" 경로가 docker 내 볼륨과 매핑이 된다.(docker inspect 명령을 통해 경로 확인 가능)
+* Dockerfile에 VOLUE으로 지정했는데 docker run 시 -v 옵션으로 로컬 경로와 매핑을 해주지 않는 경우 호스트의 "/var/lib/jenkins/volumes/MOUNT_NAME/_data" 경로가 docker 내 볼륨과 매핑이 된다.(docker inspect 명령을 통해 경로 확인 가능)
