@@ -66,11 +66,13 @@
   ```shell
   docker build --tage hello:0.1 .
   ```
+  
 
-* docker ps
+## ps 및 images 제거
 
+### Linux or Mac
 
-  * -q : container의 ID만 출력
+* -q : container의 ID만 출력
 
   * 현재 떠 있는 모든 컨테이너 stop 시키기
 
@@ -96,7 +98,33 @@
     $ docker rmi $(docker images -a -q)
     ```
 
-    ​
+### Windows
+
+* -q : container의 ID만 출력
+
+  * 현재 떠 있는 모든 컨테이너 stop 시키기
+
+    ```shell
+    > FOR /f "tokens=*" %i IN ('docker ps -q') DO docker stop %i
+    ```
+
+  * 종료한 컨테이너들 제거
+
+    ```shell
+    > FOR /f "tokens=*" %i IN ('docker ps -a -q') DO docker rm %i
+    ```
+
+  * 쓰이지 않는 이미지들(dangling) 제거
+
+    ```shell
+    > FOR /f "tokens=*" %i IN ('docker images -a --filter=dangling=true -q') DO docker rmi %i
+    ```
+
+  * 모든 이미지 제거
+
+    ```shell
+    > FOR /f "tokens=*" %i IN ('docker images -a -q') DO docker rmi %i
+    ```
 
 
 ## Dockerfile
