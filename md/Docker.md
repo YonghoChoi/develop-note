@@ -301,3 +301,25 @@ push를 하기 위해서는 로컬에서 docker로 로그인이 되어 있어야
 #get a privileged container with access to Docker daemon
 docker run --privileged -it --rm -v /var/run/docker.sock:/var/run/docker.sock -v /usr/bin/docker:/usr/bin/docker -v /var/lib:/var/lib alpine sh
 ```
+
+### Windows에서 cAdvisor 실행하기
+
+cAdvisor를 실행하기 위해서는 docker container를 실행시키는 호스트에 접근을 해야 하는데 윈도우에서는 불가능 하여 위의 접근 방식으로 볼륨을 활용하여 실행시킬 수 있다.
+
+* aphine 버전의 리눅스 이미지로 컨테이너를 생성한다.
+```
+docker run --privileged -it --rm --volume=/var/run:/var/run:rw --volume=/sys:/sys:ro --volume=/var/lib/docker/:/var/lib/docker:ro -v /var/run/docker.sock:/var/run/docker.sock -v /usr/bin/docker:/usr/bin/docker -v /var/lib:/var/lib alpine sh
+```
+
+* cAdvisor 도커 컨테이너를 실행한다.
+```
+sudo docker run \
+  --volume=/:/rootfs:ro \
+  --volume=/var/run:/var/run:rw \
+  --volume=/sys:/sys:ro \
+  --volume=/var/lib/docker/:/var/lib/docker:ro \
+  --publish=8080:8080 \
+  --detach=true \
+  --name=cadvisor \
+  google/cadvisor:latest
+```
