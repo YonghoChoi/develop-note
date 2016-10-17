@@ -1,8 +1,12 @@
 # develope-note
 
+## Note
+
 * [Docker]
 * [Thrift]
 * [패킷 보간처리]
+
+## 책 정리
 
 * [자바 네트워크 소녀 네티]
 * [리팩토링]
