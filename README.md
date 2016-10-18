@@ -12,11 +12,12 @@
 * [리팩토링]
 * [패턴을 활용한 리팩토링]
 * [Java8 in Action]
+* [D3.js]
 
 [Docker]: md/Docker.md
 [Thrift]: md/Thrift.md
 [패킷 보간처리]: md/패킷동기화.md
-[자바 네트워크 소녀 네티]: md/netty/README.md
+[자바 네트워크 소녀 네티]: md/Netty/README.md
 [리팩토링]: md/Refactoring/README.md
 [패턴을 활용한 리팩토링]: md/Refactoring-to-patterns/README.md
 [Java8 in Action]: md/Java8-in-Action/README.md
