@@ -1,6 +1,6 @@
 # Java8 in Action
 
-* [Chap6. Collecting data with streams]
+* [6장. 스트림으로 데이터 수집]
 
 
-[Chap6. Collecting data with streams]: Chap6-Collecting-data-with-streams.md
+[6장. 스트림으로 데이터 수집]: 06장.스트림으로_데이터_수집.md
