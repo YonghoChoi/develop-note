@@ -11,10 +11,10 @@
 * [14장. 리팩토링 도구]
 * [15장. 하나로 합치기]
 
-[6장. ComposingMethod]: 6.ComposingMethod.md
-[7장. MovingFeaturesBetweenObjects]: 7.MovingFeaturesBetweenObjects.md
-[8장. OrganizingData]: 8.OrganizingData.md
-[9장. SimplifyingConditionalExpressions]: 9.SimplifyingConditionalExpressions.md
+[6장. ComposingMethod]: 06.ComposingMethod.md
+[7장. MovingFeaturesBetweenObjects]: 07.MovingFeaturesBetweenObjects.md
+[8장. OrganizingData]: 08.OrganizingData.md
+[9장. SimplifyingConditionalExpressions]: 09.SimplifyingConditionalExpressions.md
 [10장. MakingMethodCallsSimpler]: 10.MakingMethodCallsSimpler.md
 [11장. DealingWithGeneralization]: 11.DealingWithGeneralization.md
 [12장. BigRefactorings]: 12.BigRefactorings.md
