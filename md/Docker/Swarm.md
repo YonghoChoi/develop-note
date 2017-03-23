@@ -236,3 +236,66 @@ wu1m9q0ktszl   \_ redis.3  redis:3.0.6  manager1  Shutdown       Running 2 minut
 2초가 지나 worker1이 구동된지 딱 10초가 된 상황을 보니 manager1도 이제 막 업그레이드를 시작한 것을 볼 수 있다. 
 
 만약 업데이트 중에 오류가 발생할 경우 inspect 명령을 통해 Update status에서 에러 메세지를 확인할 수 있고 `docker service update <SERVICE-ID>`명령을 통해 업데이트를 이어서 실행할 수 있다.
+
+현재는 모든 노드가 동작 중이고 새로운 작업이 들어오면 이를 수신하여 새로운 컨테이너를 생성하도록 할 수 있다. 하지만 서비스를 유지하다보면 어떠한 노드에 대해서 유지보수를 한다거나 조정이 필요하여 잠시 사용을 중지시켜야 할 경우도 생기게 된다. 이러한 경우를 위해 스웜에서는 drain이라는 설정을 제공한다.
+
+먼저 `docker node ls`명령을 실행하여 활성화 상태를 확인해본다.
+
+```shell
+$ docker node ls
+ID                           HOSTNAME  STATUS  AVAILABILITY  MANAGER STATUS
+iyh8a6rhtce1l3ph26hslz1yq    worker2   Ready   Active
+mbxrbunz9g0zt2iqvugog3v7q    worker1   Ready   Active
+uxyypvr7sdqonc3wo0yfb2xl2 *  manager1  Ready   Active        Leader
+```
+
+모든 노드의 AVAILABILITY가 Active 인 것을 볼 수 있다. 여기서 worker1 노드에 대해 서비스를 잠시 중단해야 할 상황이라면 아래와 같이 availability 값을 drain 으로 설정한다.
+
+```shell
+$ docker node update --availability drain worker1
+```
+
+그러면 아래와 같이 worker1의 AVAILABILITY가 Drain으로 설정된 것을 확인할 수 있다.
+
+```shell
+$ docker node ls
+ID                           HOSTNAME  STATUS  AVAILABILITY  MANAGER STATUS
+iyh8a6rhtce1l3ph26hslz1yq    worker2   Ready   Active
+mbxrbunz9g0zt2iqvugog3v7q    worker1   Ready   Drain
+uxyypvr7sdqonc3wo0yfb2xl2 *  manager1  Ready   Active        Leader
+```
+
+이렇게 되면 worker1에 구동 중이었던 컨테이너도 종료가 되면서 해당 서비스의 개수를 유지하기 위해 사용 가능한 노드에 컨테이너가 추가된다. 여기서는 아래와 같이 manager1이 worker1을 대신하여 서비스를 구동시켰다.
+
+```shell
+$ docker service ps redis
+ID            NAME         IMAGE        NODE      DESIRED STATE  CURRENT STATE           ERROR  PORTS
+r128w18u5h1a  redis.1      redis:3.0.7  manager1  Running        Running 2 minutes ago
+y4a6fhhw3aq5   \_ redis.1  redis:3.0.7  worker1   Shutdown       Shutdown 2 minutes ago
+w68xkzhovbnb   \_ redis.1  redis:3.0.6  worker1   Shutdown       Shutdown 16 hours ago
+ibdyl9x5qrfk  redis.2      redis:3.0.7  worker2   Running        Running 16 hours ago
+9rykaxivy773   \_ redis.2  redis:3.0.6  worker2   Shutdown       Shutdown 16 hours ago
+4hiqmfc0955i  redis.3      redis:3.0.7  manager1  Running        Running 16 hours ago
+wu1m9q0ktszl   \_ redis.3  redis:3.0.6  manager1  Shutdown       Shutdown 16 hours ago
+```
+
+worker1의 유지보수가 종료되어 다시 노드를 활성화 시키려면 기존의 drain으로 명령을 수행했던 부분을 active로 수행한다.
+
+```shell
+$ docker node update --availability active worker1
+```
+
+여기서 active를 한다고해서 기존에 manager1 노드가 대신 수행했던 컨테이너가 다시 worker1로 할당되는 것은 아니다. 즉, manager1이 넘겨받아 수행했던 redis 컨테이너가 지워지고 worker1에서 stop 되었던 컨테이너가 다시 start 되는 것은 아니라는 것이다. 단지 worker1 노드가 활성화되어 다음번에 작업 요청이 들어올 경우 이를 수신하여 수행할 수 있을 뿐이고, 서비스는 기존 상태를 유지한다. worker1이 활성화 되었어도 service 상태는 아래와 같이 기존과 동일하게 유지된다.
+
+```shell
+$ docker service ps redis
+ID            NAME         IMAGE        NODE      DESIRED STATE  CURRENT STATE           ERROR  PORTS
+r128w18u5h1a  redis.1      redis:3.0.7  manager1  Running        Running 2 minutes ago
+y4a6fhhw3aq5   \_ redis.1  redis:3.0.7  worker1   Shutdown       Shutdown 2 minutes ago
+w68xkzhovbnb   \_ redis.1  redis:3.0.6  worker1   Shutdown       Shutdown 16 hours ago
+ibdyl9x5qrfk  redis.2      redis:3.0.7  worker2   Running        Running 16 hours ago
+9rykaxivy773   \_ redis.2  redis:3.0.6  worker2   Shutdown       Shutdown 16 hours ago
+4hiqmfc0955i  redis.3      redis:3.0.7  manager1  Running        Running 16 hours ago
+wu1m9q0ktszl   \_ redis.3  redis:3.0.6  manager1  Shutdown       Shutdown 16 hours ago
+```
+
