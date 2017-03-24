@@ -1,3 +1,40 @@
+## 준비
+
+테스트를 위해 아래와 같이 총 5대의 서버가 필요하다. 로컬에서 한대로만 테스트를 할 수 있도록 docker-machine을 사용하여 진행을 하도록 하겠다.
+
+| 서버 이름    | 기술                                    |
+| -------- | ------------------------------------- |
+| `ca`     | CA (Certificate Authority) 서버로 작동합니다. |
+| `swarm`  | 스웜 매니저 (Swarm Manager)로 활동합니다.        |
+| `node1`  | 스웜 노드로 작동합니다.                         |
+| `node2`  | 스웜 노드로 작동합니다.                         |
+| `client` | 원격 Docker Engine 클라이언트로 작동합니다.        |
+
+각 서버에 대한 docker-machine을 생성한다.
+
+```shell
+$ docker-machine create <NODE-NAME>
+```
+
+```shell
+$ docker-machine ls
+NAME     ACTIVE   DRIVER       STATE     URL                         SWARM   DOCKER        ERRORS
+ca       -        virtualbox   Running   tcp://192.168.99.104:2376           v17.03.0-ce
+client   -        virtualbox   Running   tcp://192.168.99.108:2376           v17.03.0-ce
+node1    -        virtualbox   Running   tcp://192.168.99.106:2376           v17.03.0-ce
+node2    -        virtualbox   Running   tcp://192.168.99.107:2376           v17.03.0-ce
+swarm    -        virtualbox   Running   tcp://192.168.99.105:2376           v17.03.0-ce
+```
+
+그리고 나서 각 서버들간 통신이 가능한지 ping과 telnet을 사용하여 테스트한다.
+
+```shell
+$ ping 192.168.x.x
+$ telnet 192.168.x.x 2376
+```
+
+
+
 ## 인증기관 (CA) 서버 만들기
 
 1. CA 서버로 사용할 호스트에서 root 계정으로 로그인
@@ -108,7 +145,7 @@ CA 서버가 만들어졌으면 이제 원격지 서버에 대한 키 쌍을 만
 
    여기서는 데모용이므로, 실제 CSR을 만드는 과정은 다를 수 있다.
 
-   CN은 Common Name으로 사용자의 이름이나 회사 이름과 같은 것을 설정하면 된다.
+   CN은 Common Name으로 Docker 데몬을 실행하는 서버의 도메인을 입력해야 한다. 도메인과 다를 경우 인증서를 생성해도 접속할 수가 없다. 
 
 4. 이전 단계에서 만든 CSR을 기반으로 `swarm-cert.pem`(인증서)를 만든다 .
 
