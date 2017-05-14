@@ -561,11 +561,11 @@ AMI로 moby linux를 사용하기 때문에 ssh로 연결 시 user 명이 다른
 
    ```shell
    $ docker service create \
-   > --name=viz \
-   > --publish=5000:8080/tcp \
-   > --constraint=node.role==manager \
-   > --mount=type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock \
-   > dockersamples/visualizer
+    --name=viz \
+    --publish=5000:8080/tcp \
+    --constraint=node.role==manager \
+    --mount=type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock \
+    dockersamples/visualizer
    ```
 
    * constraint : 컨테이너 구동에 제약을 줌.
@@ -601,7 +601,6 @@ AMI로 moby linux를 사용하기 때문에 ssh로 연결 시 user 명이 다른
 
    ```shell
    $ docker network create --driver overlay vote-network
-   s7ex08vu97zmj844hngo63lso
    ```
 
    * 이렇게 생성된 network는 모든 노드에 적용이 된다.
@@ -610,11 +609,10 @@ AMI로 moby linux를 사용하기 때문에 ssh로 연결 시 user 명이 다른
 
    ```shell
    $ docker service create \
-   > --name=vote \
-   > --publish=3000:80 \
-   > --network=vote-network \
-   > subicura/sample_vote:1
-   vbt88zkl2pjksh1ewzjevr8nm
+    --name=vote \
+    --publish=3000:80 \
+    --network=vote-network \
+    subicura/sample_vote:1
    ```
 
 9. 다시 visualizer를 확인해보면 vote라는 노드가 추가된 것을 확인할 수 있다.
@@ -623,7 +621,7 @@ AMI로 moby linux를 사용하기 때문에 ssh로 연결 시 user 명이 다른
 
 10. 생성한 서비스로 접속(아까와 같이 ELB 주소에 3000번 포트로)해보면 아래와 같은 페이지가 출력된다.
 
-    ![](images/cloudformation_4.png)
+   ![](images/cloudformation_4.png)
 
 11. 현재 이 웹페이지를 출력하기 위해 한대의 서버(컨테이너)를 사용하고 있는데 scale 명령으로 간단히 3대로 늘려본다.
 
@@ -651,9 +649,9 @@ AMI로 moby linux를 사용하기 때문에 ssh로 연결 시 user 명이 다른
 
     ```shell
     $ docker service create \
-    > --network=vote-network \
-    > --name=redis \
-    > redis:alpine
+     --network=vote-network \
+     --name=redis \
+     redis:alpine
     ```
 
     * vote 서비스와 같은 네트워크에 속해있어야 하기 때문에 --network 옵션으로 vote-network를 지정해주었다.
@@ -668,11 +666,11 @@ AMI로 moby linux를 사용하기 때문에 ssh로 연결 시 user 명이 다른
 
     ```shell
     $ docker service create \
-    > --name=db \
-    > --network=result-network \
-    > --constraint=node.role==manager \
-    > --mount=type=volume,src=db-data,dst=/var/lib/postgresql/data \
-    > postgres:9.4
+     --name=db \
+     --network=result-network \
+     --constraint=node.role==manager \
+     --mount=type=volume,src=db-data,dst=/var/lib/postgresql/data \
+     postgres:9.4
     ```
 
     * db를 manager로 선택한 이유는 manager 같은 경우 security group 설정이 내부에서만 접근 가능하도록 되어 있기 때문에 외부 노출을 막기 위해 manager 쪽에만 생성되도록 설정함.
@@ -681,10 +679,10 @@ AMI로 moby linux를 사용하기 때문에 ssh로 연결 시 user 명이 다른
 
     ```shell
     $ docker service create \
-    > --name=worker \
-    > --network=vote-network \
-    > --network=result-network \
-    > subicura/sample_worker:latest
+     --name=worker \
+     --network=vote-network \
+     --network=result-network \
+     subicura/sample_worker:latest
     ```
 
     * worker는 vote-network와 result-network 모두 사용하므로 둘 다 지정.
@@ -694,11 +692,11 @@ AMI로 moby linux를 사용하기 때문에 ssh로 연결 시 user 명이 다른
 
     ```shell
     $ docker service create \
-    > --name=result \
-    > --publish=3001:80 \
-    > --network=result-network \
-    > --replicas 2 \
-    > subicura/sample_result:1
+     --name=result \
+     --publish=3001:80 \
+     --network=result-network \
+     --replicas 2 \
+     subicura/sample_result:1
     ```
 
     * replicas 옵션을 사용하여 생성 시에 두개의 서버를 사용하도록 설정.
@@ -715,8 +713,8 @@ AMI로 moby linux를 사용하기 때문에 ssh로 연결 시 user 명이 다른
 
     ```shell
     $ docker service update \
-    > --image subicura/sample_vote:2 \
-    > vote
+     --image subicura/sample_vote:2 \
+     vote
     ```
 
     * vote라는 이름의 노드에 기존의 버전 1을 사용하던 것을 버전 2로 변경.
@@ -735,8 +733,8 @@ AMI로 moby linux를 사용하기 때문에 ssh로 연결 시 user 명이 다른
 
     ```shell
     $ docker service update \
-    > --image subicura/sample_result:2 \
-    > result
+     --image subicura/sample_result:2 \
+     result
     ```
 
 22. 변경된 결과 페이지 확인
@@ -748,8 +746,7 @@ AMI로 moby linux를 사용하기 때문에 ssh로 연결 시 user 명이 다른
     * docker-stack.yml
 
       ```shell
-      $ curl https://gist.githubusercontent.com/subicura/07a4e4f38768f9a1e6eeae37c6e1ad87/raw/8810e90be73bcd21ee2c65e6e5c220c4d08fd17c/docker-stack.yml > docker-stack.
-      yml
+      $ curl https://gist.githubusercontent.com/subicura/07a4e4f38768f9a1e6eeae37c6e1ad87/raw/8810e90be73bcd21ee2c65e6e5c220c4d08fd17c/docker-stack.yml > docker-stack.yml
       ```
 
       * 위 yaml 파일의 내용
@@ -903,7 +900,7 @@ AMI로 moby linux를 사용하기 때문에 ssh로 연결 시 user 명이 다른
 
     * 대쉬보드는 미리 만들어진 것을 import해서 사용
 
-      * 설정(톱니바퀴아이콘) > import > 609 입력
+      * Home > import > 609 입력
 
     * 아래와 같이 모니터링할 항목들을 지정후 import
 

@@ -33,6 +33,14 @@
 
 
 
+# VPC
+
+* Virtual Private Cloud
+* 논리적으로 격리된 가상의 네트워크 공간을 제공하는 서비스
+* ​
+
+
+
 
 # Amazon Aurora
 
