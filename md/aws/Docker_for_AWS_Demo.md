@@ -4,9 +4,19 @@
 
 
 
-### visualizer 실행
+시작에 앞서 [Docker for AWS](https://docs.docker.com/docker-for-aws/)를 통해 미리 정의된 AWS의 CloudFormation 템플릿을 사용하여 AWS 리소스들을 생성하고 아래 절차를 수행한다. (이 과정은 기본적으로 Next만 수행하면 되므로 생략) 
+
+리소스들이 생성되는 시간은 대략 10분정도 소요
+
+
+
+### Demo 수행 절차
 
 1. CloudFormation에서 Output을 선택하여 manager 목록으로 이동
+
+   * 그냥 EC2 인스턴스 메뉴로 들어가도 됨
+   * 인스턴스 이름이 Manager와 Worker로 나뉘어서 생성이 되어 있음
+   * docker swarm 명령은 manager를 통해서만 수행되고 수행된 명령에 따라 worker 또는 manager에 노드가 생성됨
 
 2. manager 목록 중 하나를 선택해서 ssh  접속.
 
