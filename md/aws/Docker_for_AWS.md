@@ -1,6 +1,6 @@
 # Docker for AWS
 
-[Docker for AWS](https://docs.docker.com/docker-for-aws/#docker-community-edition-ce-for-aws)는 Stable/Edge/Test 채널을 선택하여 구성할 수 있는데 안정화된 버전인 [Stable 채널](https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=Docker&templateURL=https://editions-us-east-1.s3.amazonaws.com/aws/stable/Docker.tmpl)을 사용하도록 한다. `https://editions-us-east-1.s3.amazonaws.com/aws/stable/Docker.tmpl` 템플릿 파일을 기반으로 구성이 되는데 여기서 Resource 부분을 하나씩 살펴보도록 하겠다.
+[Docker for AWS](https://docs.docker.com/docker-for-aws/#docker-community-edition-ce-for-aws)는 Stable/Edge/Test 채널을 선택하여 구성할 수 있는데 안정화된 버전인 [Stable 채널](https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=Docker&templateURL=https://editions-us-east-1.s3.amazonaws.com/aws/stable/Docker.tmpl)을 사용하도록 한다. `https://editions-us-east-1.s3.amazonaws.com/aws/stable/Docker.tmpl` 템플릿 파일을 기반으로 구성이 된다.
 
 
 
@@ -18,10 +18,45 @@ AMI로 moby linux를 사용하기 때문에 ssh로 연결 시 user 명이 다른
 
 
 
+## 필요한 권한
+
+- CloudFormation에 의해 생성되는 리소스들
+  - EC2 인스턴스 + 자동 확장 그룹
+  - IAM 프로파일
+  - DynamoDB 테이블
+  - SQS 대기열
+  - VPC + 서브넷 및 보안 그룹
+  - ELB
+  - CloudWatch 로그 그룹
+- 배포하려는 지역의 AWS SSH 키
+- EC2-VPC를 지원하는 AWS 계정
+
+
+
+## 실행 정보
+
+* 처음부터 필요한 모든 것을 생성하는 CloudFormation 템플릿으로 시작
+* CloudFormation은 먼저 서브넷과 보안 그룹과 함께 새 VPC를 생성
+* 두 개의 Auto Scaling Group 생성
+  * Manager 용
+  * Worker 용
+* Manager 들이 먼저 시작되고, Raft에 의해 정족수(quorum)가 생성되고나면 Worker들이 시작되고 하나씩 swarm에 join 한다.
+  * 이 단계에서 응용프로그램 배포 가능
+* Auto Scaling Group에 의해 인스턴스 수가 증가되면 시작될 새 노드는 자동으로 swarm에 join 한다.
+* ELB는 swarm으로의 트래픽 라우팅을 위해 설정된다.
+* Docker for AWS에서 실행되는 컨테이너들은 Cloudwatch 로깅을 자동으로 구성한다.
+  * 컨테이너의 로그를 CloudWatch에서 확인 가능
+* Docker for AWS의 구성에는 swarm cluster를 위한 몇가지 시스템 컨테이너가 실행된다.
+  * 원할한 수행을 위해 해당 컨테이너는 중지시키거나 변경시키지 않는 것이 좋다.
+
+
+
 
 ## 사용된 리소스들
 
-* AWS::EC2::VPCGatewayAttachment
+### AttachGateway
+
+* 리소스 : AWS::EC2::VPCGatewayAttachment
 
   ```json
   "AttachGateway": {
@@ -45,186 +80,412 @@ AMI로 moby linux를 사용하기 때문에 ssh로 연결 시 user 명이 다른
   * Vpc와 InternetGateway에 의존적이므로 Properties에 각 항목에 대해 Ref로 설정했다.
   * 설정은 Ref를 통해 참조 형식으로 연결된다.
 
-* AWS::Logs::LogGroup
+
+
+
+### Vpc
+
+* 리소스 : AWS::EC2::VPC
+
+  ```json
+  "Vpc": {
+        "Properties": {
+          "CidrBlock": {
+            "Fn::FindInMap": [
+              "VpcCidrs",
+              "vpc",
+              "cidr"
+            ]
+          },
+          "EnableDnsHostnames": "true",
+          "EnableDnsSupport": "true",
+          "Tags": [
+            {
+              "Key": "Name",
+              "Value": {
+                "Fn::Join": [
+                  "-",
+                  [
+                    {
+                      "Ref": "AWS::StackName"
+                    },
+                    "VPC"
+                  ]
+                ]
+              }
+            }
+          ]
+        },
+        "Type": "AWS::EC2::VPC"
+      }
+  ```
+
+  * Mapper에 설정된 VpcCidrs에서 Vpc에 해당하는 cidr 값을 가져와 사용
+
+    ```json
+    "vpc": {
+      "cidr": "172.31.0.0/16"
+    }
+    ```
+
+  * EnableDnsSupport : VPC에서 DNS 지원 여부
+
+    * true 인 경우 Amazon DNS 서버는 인스턴스의 DNS 호스트 이름으로 ip 주소를 확인
+
+  * EnableDnsHostnames : VPC에서 실행 된 인스턴스에서 DNS 호스트 이름을 가져올 지 여부
+
+    * true인 경우 VPC의 인스턴스에서 DNS 호스트 이름을 가져온다.
+    * true로 설정하려는 경우 EnableDnsSupport도 true로 설정되어야 함.
+
+  * Tags : 여기서는 Name이라는 key로 CloudFormation 수행 시 지정했던 스택 이름을 뒤에 VPC를 붙여서 태그를 하나 생성한다.
+
+    * Stack 이름이 docker-for-aws인 경우 docker-for-aws-VPC로 태그 생성
+
+
+
+### InternetGateway
+
+* 리소스 : AWS::EC2::InternetGateway
+
+  ```json
+  "InternetGateway": {
+    "DependsOn": "Vpc",
+    "Properties": {
+      "Tags": [
+        {
+          "Key": "Name",
+          "Value": {
+            "Fn::Join": [
+              "-",
+              [
+                {
+                  "Ref": "AWS::StackName"
+                },
+                "IGW"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    "Type": "AWS::EC2::InternetGateway"
+  }
+  ```
+  * VPC에서 인터넷 연결을 위한 인터넷 게이트웨이 생성
+  * EC2에서 해당 인터넷 게이트웨이를 사용하여 외부 인터넷에 연결
+  * Tags : 이 리소스를 위한 임의의 태그 세트(key-value)
+    * 스택 이름이 docker-for-aws라면 docker-for-aws-IGW로 태그 생성
+
+
+
+### DockerLogGroup
+
+* 리소스 : AWS::Logs::LogGroup
 
   ```json
   "DockerLogGroup": {
-              "Condition": "CreateLogResources",
-              "Properties": {
-                  "LogGroupName": {
-                      "Fn::Join": [
-                          "-",
-                          [
-                              {
-                                  "Ref": "AWS::StackName"
-                              },
-                              "lg"
-                          ]
-                      ]
-                  },
-                  "RetentionInDays": 7
-              },
-              "Type": "AWS::Logs::LogGroup"
-          }
+    "Condition": "CreateLogResources",
+    "Properties": {
+      "LogGroupName": {
+        "Fn::Join": [
+          "-",
+          [
+            {
+              "Ref": "AWS::StackName"
+            },
+            "lg"
+          ]
+        ]
+      },
+      "RetentionInDays": 7
+    },
+    "Type": "AWS::Logs::LogGroup"
+  }
   ```
 
+  * CreateLogResources를 Conditions 섹션을 참조
+
+    ```json
+    "Conditions": {
+      "CreateLogResources": {
+        "Fn::Equals": [
+          {
+            "Ref": "EnableCloudWatchLogs"
+          },
+          "yes"
+        ]
+      }
+      ...
+    }
+    ```
+
+    * Conditions 섹션은 리소스가 작성되는 시기 또는 특성이 정의되는 시기를 정의하는 명령문이 포함됨
+    * 예를들면, 값이 다른 값과 같은지를 비교할 수 있음
+    * 조건의 결과에 따라 조건부로 리소스를 생성할 수 있음
+    * 여기서 참조하는 CreateLogResources는 EnableCloudWatchLogs를 참조하고 있는데 이 값은 파라미터를 통해 유저의 입력에 따라 yes 또는 no 값이 설정된다. yes인 경우에만 해당 리소스를 생성
+
   * CloudWatch의 LogGroup을 추가한다.
+
   * 내장함수인 Fn::Join을 사용하여 LogGroup의 이름을 설정한다.
     * "-"를 구분자로 사용하고, 현재의 StackName이 DockerTest라고 가정한다면 `DockerTest-lg`라는 이름으로 생성된다.
+
   * RetentionInDay를 7로 설정했기 때문에 CloudWatch 로그에 보관되는 일 수는 7일로 설정된다.
     * 이 이벤트 기간이 만료되면 로그는 자동으로 삭제된다.
 
-* AWS::IAM::Policy
+
+
+
+### DynDBPolicies
+
+* 리소스 : AWS::IAM::Policy
 
   ```json
   "DynDBPolicies": {
-              "DependsOn": [
-                  "ProxyRole",
-                  "SwarmDynDBTable"
-              ],
-              "Properties": {
-                  "PolicyDocument": {
-                      "Statement": [
-                          {
-                              "Action": [
-                                  "dynamodb:PutItem",
-                                  "dynamodb:DeleteItem",
-                                  "dynamodb:GetItem",
-                                  "dynamodb:UpdateItem",
-                                  "dynamodb:Query"
-                              ],
-                              "Effect": "Allow",
-                              "Resource": {
-                                  "Fn::Join": [
-                                      "",
-                                      [
-                                          "arn:aws:dynamodb:",
-                                          {
-                                              "Ref": "AWS::Region"
-                                          },
-                                          ":",
-                                          {
-                                              "Ref": "AWS::AccountId"
-                                          },
-                                          ":table/",
-                                          {
-                                              "Ref": "SwarmDynDBTable"
-                                          }
-                                      ]
-                                  ]
-                              }
-                          }
-                      ],
-                      "Version": "2012-10-17"
+    "DependsOn": [
+      "ProxyRole",
+      "SwarmDynDBTable"
+    ],
+    "Properties": {
+      "PolicyDocument": {
+        "Statement": [
+          {
+            "Action": [
+              "dynamodb:PutItem",
+              "dynamodb:DeleteItem",
+              "dynamodb:GetItem",
+              "dynamodb:UpdateItem",
+              "dynamodb:Query"
+            ],
+            "Effect": "Allow",
+            "Resource": {
+              "Fn::Join": [
+                "",
+                [
+                  "arn:aws:dynamodb:",
+                  {
+                    "Ref": "AWS::Region"
                   },
-                  "PolicyName": "dyndb-getput",
-                  "Roles": [
-                      {
-                          "Ref": "ProxyRole"
-                      }
-                  ]
-              },
-              "Type": "AWS::IAM::Policy"
+                  ":",
+                  {
+                    "Ref": "AWS::AccountId"
+                  },
+                  ":table/",
+                  {
+                    "Ref": "SwarmDynDBTable"
+                  }
+                ]
+              ]
+            }
           }
+        ],
+        "Version": "2012-10-17"
+      },
+      "PolicyName": "dyndb-getput",
+      "Roles": [
+        {
+          "Ref": "ProxyRole"
+        }
+      ]
+    },
+    "Type": "AWS::IAM::Policy"
+  }
   ```
 
   * DynamoDB를 사용하기 위한 정책을 IAM에 추가한다.
   * dynamoDB에 데이터를 추가/삭제/변경/질의 를 사용할 수 있도록 권한을 부여했다.
   * PolicyDocument : 지정된 사용자 또는 그룹에 추가 할 권한이 포함된 정책 문서
+    * [IAM 정책 요소](http://docs.aws.amazon.com/ko_kr/IAM/latest/UserGuide/reference_policies_elements.html) 참조
   * PolicyName : 정책 이름.
     * IAM Role에 대한 정책 목록을 지정하려면 각 정책마다 고유한 이름이 필요.
   * Roles : 이 정책에 첨부할 AWS::IAM::Role의 이름.
     * Ref를 사용하여 지정하는 경우 DependsOn에 명시되어야함.
 
-* AWS::ElasticLoadBalancing::LoadBalancer
+
+
+
+### ProxyRole
+
+* 리소스 : AWS::IAM::Role
+
+  ```json
+  "ProxyRole": {
+    "Properties": {
+      "AssumeRolePolicyDocument": {
+        "Statement": [
+          {
+            "Action": [
+              "sts:AssumeRole"
+            ],
+            "Effect": "Allow",
+            "Principal": {
+              "Service": [
+                "ec2.amazonaws.com",
+                "autoscaling.amazonaws.com"
+              ]
+            }
+          }
+        ],
+        "Version": "2012-10-17"
+      },
+      "Path": "/"
+    },
+    "Type": "AWS::IAM::Role"
+  }
+  ```
+
+  * IAM Role 생성. 이를 통해 안전하게 AWS 리소스에 액세스 할 수 있게 함
+  * AssumeRolePolicyDocument : 이 역할과 관련된 신뢰 정책
+    * Statement의 내용은 [IAM 정책 요소](http://docs.aws.amazon.com/ko_kr/IAM/latest/UserGuide/reference_policies_elements.html) 참조
+  * Path : 이 역할과 연결된 경로
+    * IAM API 또는 AWS CLI를 사용하여 IAM 엔터티를 생성하는 경우, 해당 엔터티에 경로를 부여할 수 있음
+    * 이를 통해 속한 조직의 부서를 식별하도록 할 수 있음
+    * 예를 들면, /division_abc/subdivision_xyz/product_1234/engineering/
+
+
+
+### SwarmDynDBTable
+
+* 리소스 : AWS::DynamoDB::Table
+
+  ```json
+  "SwarmDynDBTable": {
+    "DependsOn": "ExternalLoadBalancer",
+    "Properties": {
+      "AttributeDefinitions": [
+        {
+          "AttributeName": "node_type",
+          "AttributeType": "S"
+        }
+      ],
+      "KeySchema": [
+        {
+          "AttributeName": "node_type",
+          "KeyType": "HASH"
+        }
+      ],
+      "ProvisionedThroughput": {
+        "ReadCapacityUnits": 1,
+        "WriteCapacityUnits": 1
+      },
+      "TableName": {
+        "Fn::Join": [
+          "-",
+          [
+            {
+              "Ref": "AWS::StackName"
+            },
+            "dyndbtable"
+          ]
+        ]
+      }
+    },
+    "Type": "AWS::DynamoDB::Table"
+  }
+  ```
+
+  * DynamoDB 테이블 생성.
+    * CloudForamtion을 사용하면 일반적으로 DynamoDB 테이블을 병렬적으로 생성한다. 그러므로 인덱스가 있는 여러 테이블이 포함되어 있다면 테이블을 순차적으로 생성되도록 종속성을 선언해야 한다.
+  * AttributeDefinitions : 테이블의 속성 정의 목록 (AttributeName, AttributeType)
+    * 여기서는 node_type이 속성 이름, 속성 타입이 S라는 것은 문자열이라는 의미. N이면 숫자
+  * KeySchema : 테이블의 기본키 설정
+  * ProvisionedThroughput : 테이블의 처리량
+    * ReadCapacityUnits : 최소 읽기 수
+    * WriteCapacityUnits : 최소 쓰기 수
+
+
+
+
+### ExternalLoadBalancer
+
+* 리소스 : AWS::ElasticLoadBalancing::LoadBalancer
 
   ```json
   "ExternalLoadBalancer": {
-              "DependsOn": [
-                  "AttachGateway",
-                  "ExternalLoadBalancerSG",
-                  "PubSubnetAz1",
-                  "PubSubnetAz2",
-                  "PubSubnetAz3"
-              ],
-              "Properties": {
-                  "ConnectionSettings": {
-                      "IdleTimeout": 600
-                  },
-                  "CrossZone": "true",
-                  "HealthCheck": {
-                      "HealthyThreshold": "2",
-                      "Interval": "10",
-                      "Target": "HTTP:44554/",
-                      "Timeout": "2",
-                      "UnhealthyThreshold": "4"
-                  },
-                  "Listeners": [
-                      {
-                          "InstancePort": "7",
-                          "LoadBalancerPort": "7",
-                          "Protocol": "TCP"
-                      }
-                  ],
-                  "LoadBalancerName": {
-                      "Fn::Join": [
-                          "-",
-                          [
-                              {
-                                  "Ref": "AWS::StackName"
-                              },
-                              "ELB"
-                          ]
-                      ]
-                  },
-                  "SecurityGroups": [
-                      {
-                          "Ref": "ExternalLoadBalancerSG"
-                      }
-                  ],
-                  "Subnets": {
-                      "Fn::If": [
-                          "HasOnly2AZs",
-                          [
-                              {
-                                  "Ref": "PubSubnetAz1"
-                              },
-                              {
-                                  "Ref": "PubSubnetAz2"
-                              }
-                          ],
-                          [
-                              {
-                                  "Ref": "PubSubnetAz1"
-                              },
-                              {
-                                  "Ref": "PubSubnetAz2"
-                              },
-                              {
-                                  "Ref": "PubSubnetAz3"
-                              }
-                          ]
-                      ]
-                  },
-                  "Tags": [
-                      {
-                          "Key": "Name",
-                          "Value": {
-                              "Fn::Join": [
-                                  "-",
-                                  [
-                                      {
-                                          "Ref": "AWS::StackName"
-                                      },
-                                      "ELB"
-                                  ]
-                              ]
-                          }
-                      }
-                  ]
-              },
-              "Type": "AWS::ElasticLoadBalancing::LoadBalancer"
+    "DependsOn": [
+      "AttachGateway",
+      "ExternalLoadBalancerSG",
+      "PubSubnetAz1",
+      "PubSubnetAz2",
+      "PubSubnetAz3"
+    ],
+    "Properties": {
+      "ConnectionSettings": {
+        "IdleTimeout": 600
+      },
+      "CrossZone": "true",
+      "HealthCheck": {
+        "HealthyThreshold": "2",
+        "Interval": "10",
+        "Target": "HTTP:44554/",
+        "Timeout": "2",
+        "UnhealthyThreshold": "4"
+      },
+      "Listeners": [
+        {
+          "InstancePort": "7",
+          "LoadBalancerPort": "7",
+          "Protocol": "TCP"
+        }
+      ],
+      "LoadBalancerName": {
+        "Fn::Join": [
+          "-",
+          [
+            {
+              "Ref": "AWS::StackName"
+            },
+            "ELB"
+          ]
+        ]
+      },
+      "SecurityGroups": [
+        {
+          "Ref": "ExternalLoadBalancerSG"
+        }
+      ],
+      "Subnets": {
+        "Fn::If": [
+          "HasOnly2AZs",
+          [
+            {
+              "Ref": "PubSubnetAz1"
+            },
+            {
+              "Ref": "PubSubnetAz2"
+            }
+          ],
+          [
+            {
+              "Ref": "PubSubnetAz1"
+            },
+            {
+              "Ref": "PubSubnetAz2"
+            },
+            {
+              "Ref": "PubSubnetAz3"
+            }
+          ]
+        ]
+      },
+      "Tags": [
+        {
+          "Key": "Name",
+          "Value": {
+            "Fn::Join": [
+              "-",
+              [
+                {
+                  "Ref": "AWS::StackName"
+                },
+                "ELB"
+              ]
+            ]
           }
+        }
+      ]
+    },
+    "Type": "AWS::ElasticLoadBalancing::LoadBalancer"
+  }
   ```
 
   * ConnectionSettings : 프런트엔드와 백엔드의 연결이 유휴 상태로 유지되는 기간 지정
@@ -260,27 +521,33 @@ AMI로 moby linux를 사용하기 때문에 ssh로 연결 시 user 명이 다른
     * 여기서는 Fn::If를 사용하여 `HasOnly2AZs` 조건이 존재하는 경우 PubSubAZ1~2 두개만 사용하고, 그렇지 않으면 1~3 세개를 사용한다. `HasOnly2AZs`가 존재하므로 여기서는 두개의 AZ를 사용.
   * Tags : 임의의 태그 집합 (key-value)
 
-* AWS::EC2::SecurityGroup
+
+
+
+
+### ExternalLoadBalancerSG
+
+* 리소스 : AWS::EC2::SecurityGroup
 
   ```json
   "ExternalLoadBalancerSG": {
-              "DependsOn": "Vpc",
-              "Properties": {
-                  "GroupDescription": "External Load Balancer SecurityGroup",
-                  "SecurityGroupIngress": [
-                      {
-                          "CidrIp": "0.0.0.0/0",
-                          "FromPort": "0",
-                          "IpProtocol": "-1",
-                          "ToPort": "65535"
-                      }
-                  ],
-                  "VpcId": {
-                      "Ref": "Vpc"
-                  }
-              },
-              "Type": "AWS::EC2::SecurityGroup"
-          }
+    "DependsOn": "Vpc",
+    "Properties": {
+      "GroupDescription": "External Load Balancer SecurityGroup",
+      "SecurityGroupIngress": [
+        {
+          "CidrIp": "0.0.0.0/0",
+          "FromPort": "0",
+          "IpProtocol": "-1",
+          "ToPort": "65535"
+        }
+      ],
+      "VpcId": {
+        "Ref": "Vpc"
+      }
+    },
+    "Type": "AWS::EC2::SecurityGroup"
+  }
   ```
 
   * 외부 로드밸런서에 대한 SecurityGroup 설정
@@ -293,238 +560,363 @@ AMI로 moby linux를 사용하기 때문에 ssh로 연결 시 user 명이 다른
       * -1은 모든 프로토콜을 의미.
     * ToPort : Tcp, UDP 프로토콜의 포트 범위 끝.
 
-* AWS::EFS::FileSystem
+
+
+
+
+### PubSubnetAz1
+
+* 리소스 : AWS::EC2::Subnet
+
+  ```json
+  "PubSubnetAz1": {
+    "DependsOn": "Vpc",
+    "Properties": {
+      "AvailabilityZone": {
+        "Fn::Select": [
+          {
+            "Fn::FindInMap": [
+              "AWSRegion2AZ",
+              {
+                "Ref": "AWS::Region"
+              },
+              "AZ0"
+            ]
+          },
+          {
+            "Fn::GetAZs": {
+              "Ref": "AWS::Region"
+            }
+          }
+        ]
+      },
+      "CidrBlock": {
+        "Fn::FindInMap": [
+          "VpcCidrs",
+          "pubsubnet1",
+          "cidr"
+        ]
+      },
+      "Tags": [
+        {
+          "Key": "Name",
+          "Value": {
+            "Fn::Join": [
+              "-",
+              [
+                {
+                  "Ref": "AWS::StackName"
+                },
+                "Subnet1"
+              ]
+            ]
+          }
+        }
+      ],
+      "VpcId": {
+        "Ref": "Vpc"
+      }
+    },
+    "Type": "AWS::EC2::Subnet"
+  }
+  ```
+
+  * AvailabilityZone : 서브넷을 사용할 가용 영역
+
+    * Fn::Select는 두번째 인자인 리스트에서 첫번째 인자로 주어진 인덱스에 해당하는 항목을 참조하여 반환
+
+      * 여기서는 AWSRegion2AZ라는 맵에서 Fn::FindInMap을 사용하여 "AZ0"의 키에 해당하는 값을 반환한다. 그 값은 "0"
+
+        ```json
+        "Mappings": {
+          ...
+          "AWSRegion2AZ": {
+            "ap-northeast-1": {
+              "AZ0": "0",
+              "AZ1": "1",
+              "AZ2": "0",
+              "EFSSupport": "no",
+              "Name": "Tokyo",
+              "NumAZs": "2"
+            },
+          ...
+        }
+        ```
+
+    * Fn::GetAZs는 지정된 영역의 가용 영역을 나열하는 배열을 반환
+
+      * 여기서는 AWS::Region을 참조하고 있으므로 현재 선택된 리전의 모든 가용영역이 반환된다.
+      * 반환된 가용 영역 중 위에서 Fn::Select에 의해 선택된 인덱스가 0이므로 첫번째 가용영역이 AvailabilityZone이 된다.
+
+  * CidrBlock : 서브넷 범위에 해당하는 CIDR 블록
+
+    * Fn::FindInMap을 사용하여 VpcCidrs 맵의 서브키 pubsubnet1의 서브키 cidr의 값 참조
+
+      ```json
+      "VpcCidrs": {
+        ...
+        "vpc": {
+          "cidr": "172.31.0.0/16"
+        }
+      }
+      ```
+
+
+
+### PubSubnetAz2~3
+
+* 위의 PubSubnetAz1과 동일한 방식으로 동작
+* AvailabilityZone 설정에서 AZ 선택 시 참조하는 항목만 AZ1~2로 증가
+
+
+
+
+
+### FileSystemGP
+
+* 리소스 : AWS::EFS::FileSystem
 
   ```json
   "FileSystemGP": {
-              "Condition": "EFSSupported",
-              "Properties": {
-                  "FileSystemTags": [
-                      {
-                          "Key": "Name",
-                          "Value": {
-                              "Fn::Join": [
-                                  "-",
-                                  [
-                                      {
-                                          "Ref": "AWS::StackName"
-                                      },
-                                      "EFS-GP"
-                                  ]
-                              ]
-                          }
-                      }
-                  ],
-                  "PerformanceMode": "generalPurpose"
-              },
-              "Type": "AWS::EFS::FileSystem"
+    "Condition": "EFSSupported",
+    "Properties": {
+      "FileSystemTags": [
+        {
+          "Key": "Name",
+          "Value": {
+            "Fn::Join": [
+              "-",
+              [
+                {
+                  "Ref": "AWS::StackName"
+                },
+                "EFS-GP"
+              ]
+            ]
           }
+        }
+      ],
+      "PerformanceMode": "generalPurpose"
+    },
+    "Type": "AWS::EFS::FileSystem"
+  }
   ```
 
+  * Condition에 의해 EFSSupported가 true인 경우에만 서비스 생성
+
+    ```json
+    "EFSSupported": {
+      "Fn::Equals": [
+        {
+          "Fn::FindInMap": [
+            "AWSRegion2AZ",
+            {
+              "Ref": "AWS::Region"
+            },
+            "EFSSupport"
+          ]
+        },
+        "yes"
+      ]
+    }
+    ```
+
+    * Fn::FindInMap을 사용하여 AWSRegion2AZ의 서브키로 AWS::Region을 참조한 값을 사용하고 이를 통해 반환한 값에서 EFSSupport에 해당하는 값을 반환
+
+      ```json
+      "AWSRegion2AZ": {
+        "ap-northeast-1": {
+          "AZ0": "0",
+          "AZ1": "1",
+          "AZ2": "0",
+          "EFSSupport": "no",
+          "Name": "Tokyo",
+          "NumAZs": "2"
+        }
+        ...
+      }
+      ```
+
+      * 여기선 값이 no이므로 생성되지 않음
+
   * Amazon Elastic File System에 새 파일 시스템 생성.
+
   * EC2에서 EFS 파일시스템을 마운트 하려면 AWS::EFS::MountTarget을 만들어야함.
+
   * FileSystemTags : 파일 시스템과 연결할 태그.
+
   * PerformanceMode : 파일 시스템의 성능 모드.
     * generalPurpose와 maxIO 중에 선택 가능.
     * generalPurpose를 사용할 것을 권장.
 
-* AWS::EFS::FileSystem
+
+
+
+
+### FileSystemMaxIO
+
+* 리소스 : AWS::EFS::FileSystem
 
   ```json
   "FileSystemMaxIO": {
-              "Condition": "EFSSupported",
-              "Properties": {
-                  "FileSystemTags": [
-                      {
-                          "Key": "Name",
-                          "Value": {
-                              "Fn::Join": [
-                                  "-",
-                                  [
-                                      {
-                                          "Ref": "AWS::StackName"
-                                      },
-                                      "EFS-MaxIO"
-                                  ]
-                              ]
-                          }
-                      }
-                  ],
-                  "PerformanceMode": "maxIO"
-              },
-              "Type": "AWS::EFS::FileSystem"
+    "Condition": "EFSSupported",
+    "Properties": {
+      "FileSystemTags": [
+        {
+          "Key": "Name",
+          "Value": {
+            "Fn::Join": [
+              "-",
+              [
+                {
+                  "Ref": "AWS::StackName"
+                },
+                "EFS-MaxIO"
+              ]
+            ]
           }
+        }
+      ],
+      "PerformanceMode": "maxIO"
+    },
+    "Type": "AWS::EFS::FileSystem"
+  }
   ```
 
   * 위와 설명 동일.
   * 여기서는 성능 모드를 maxIO로 지정했음.
+  * 마찬가지로 Condition에 해당하는 EFSSupported 값이 no이므로 서비스가 생성되지 않음
 
-* AWS::EC2::InternetGateway
 
-  ```json
-  "InternetGateway": {
-              "DependsOn": "Vpc",
-              "Properties": {
-                  "Tags": [
-                      {
-                          "Key": "Name",
-                          "Value": {
-                              "Fn::Join": [
-                                  "-",
-                                  [
-                                      {
-                                          "Ref": "AWS::StackName"
-                                      },
-                                      "IGW"
-                                  ]
-                              ]
-                          }
-                      }
-                  ]
-              },
-              "Type": "AWS::EC2::InternetGateway"
-          }
-  ```
 
-  * VPC에서 인터넷 연결을 위한 인터넷 게이트웨이 생성
-  * 인터넷 게이트웨이를 만든 후 VPC에 연결
-  * Tags : 이 리소스를 위한 임의의 태그 세트(key-value)
 
-* AWS::AutoScaling::AutoScalingGroup
+
+### ManagerAsg
+
+* 리소스 : AWS::AutoScaling::AutoScalingGroup
 
   ```json
   "ManagerAsg": {
-              "CreationPolicy": {
-                  "ResourceSignal": {
-                      "Count": {
-                          "Ref": "ManagerSize"
-                      },
-                      "Timeout": "PT20M"
-                  }
-              },
-              "DependsOn": [
-                  "SwarmDynDBTable",
-                  "PubSubnetAz1",
-                  "PubSubnetAz2",
-                  "PubSubnetAz3",
-                  "ExternalLoadBalancer"
-              ],
-              "Properties": {
-                  "DesiredCapacity": {
-                      "Ref": "ManagerSize"
-                  },
-                  "HealthCheckGracePeriod": 300,
-                  "HealthCheckType": "ELB",
-                  "LaunchConfigurationName": {
-                      "Ref": "ManagerLaunchConfigAws1"
-                  },
-                  "LoadBalancerNames": [
-                      {
-                          "Ref": "ExternalLoadBalancer"
-                      }
-                  ],
-                  "MaxSize": 5,
-                  "MinSize": 0,
-                  "Tags": [
-                      {
-                          "Key": "Name",
-                          "PropagateAtLaunch": true,
-                          "Value": {
-                              "Fn::Join": [
-                                  "-",
-                                  [
-                                      {
-                                          "Ref": "AWS::StackName"
-                                      },
-                                      "Manager"
-                                  ]
-                              ]
-                          }
-                      },
-                      {
-                          "Key": "swarm-node-type",
-                          "PropagateAtLaunch": true,
-                          "Value": "manager"
-                      },
-                      {
-                          "Key": "swarm-stack-id",
-                          "PropagateAtLaunch": true,
-                          "Value": {
-                              "Ref": "AWS::StackId"
-                          }
-                      },
-                      {
-                          "Key": "DOCKER_FOR_AWS_VERSION",
-                          "PropagateAtLaunch": true,
-                          "Value": {
-                              "Fn::FindInMap": [
-                                  "DockerForAWS",
-                                  "version",
-                                  "forAws"
-                              ]
-                          }
-                      },
-                      {
-                          "Key": "DOCKER_VERSION",
-                          "PropagateAtLaunch": true,
-                          "Value": {
-                              "Fn::FindInMap": [
-                                  "DockerForAWS",
-                                  "version",
-                                  "docker"
-                              ]
-                          }
-                      }
-                  ],
-                  "VPCZoneIdentifier": [
-                      {
-                          "Fn::If": [
-                              "HasOnly2AZs",
-                              {
-                                  "Fn::Join": [
-                                      ",",
-                                      [
-                                          {
-                                              "Ref": "PubSubnetAz1"
-                                          },
-                                          {
-                                              "Ref": "PubSubnetAz2"
-                                          }
-                                      ]
-                                  ]
-                              },
-                              {
-                                  "Fn::Join": [
-                                      ",",
-                                      [
-                                          {
-                                              "Ref": "PubSubnetAz1"
-                                          },
-                                          {
-                                              "Ref": "PubSubnetAz2"
-                                          },
-                                          {
-                                              "Ref": "PubSubnetAz3"
-                                          }
-                                      ]
-                                  ]
-                              }
-                          ]
-                      }
-                  ]
-              },
-              "Type": "AWS::AutoScaling::AutoScalingGroup",
-              "UpdatePolicy": {
-                  "AutoScalingRollingUpdate": {
-                      "MaxBatchSize": "1",
-                      "MinInstancesInService": {
-                          "Ref": "ManagerSize"
-                      },
-                      "PauseTime": "PT20M",
-                      "WaitOnResourceSignals": "true"
-                  }
-              }
+    "CreationPolicy": {
+      "ResourceSignal": {
+        "Count": {
+          "Ref": "ManagerSize"
+        },
+        "Timeout": "PT20M"
+      }
+    },
+    "DependsOn": [
+      "SwarmDynDBTable",
+      "PubSubnetAz1",
+      "PubSubnetAz2",
+      "PubSubnetAz3",
+      "ExternalLoadBalancer",
+      "ExternalLoadBalancer"
+    ],
+    "Properties": {
+      "DesiredCapacity": {
+        "Ref": "ManagerSize"
+      },
+      "HealthCheckGracePeriod": 300,
+      "HealthCheckType": "ELB",
+      "LaunchConfigurationName": {
+        "Ref": "ManagerLaunchConfigAws2"
+      },
+      "LoadBalancerNames": [
+        {
+          "Ref": "ExternalLoadBalancer"
+        }
+      ],
+      "MaxSize": 5,
+      "MinSize": 0,
+      "Tags": [
+        {
+          "Key": "Name",
+          "PropagateAtLaunch": true,
+          "Value": {
+            "Fn::Join": [
+              "-",
+              [
+                {
+                  "Ref": "AWS::StackName"
+                },
+                "Manager"
+              ]
+            ]
           }
+        },
+        {
+          "Key": "swarm-node-type",
+          "PropagateAtLaunch": true,
+          "Value": "manager"
+        },
+        {
+          "Key": "swarm-stack-id",
+          "PropagateAtLaunch": true,
+          "Value": {
+            "Ref": "AWS::StackId"
+          }
+        },
+        {
+          "Key": "DOCKER_FOR_AWS_VERSION",
+          "PropagateAtLaunch": true,
+          "Value": {
+            "Fn::FindInMap": [
+              "DockerForAWS",
+              "version",
+              "forAws"
+            ]
+          }
+        },
+        {
+          "Key": "DOCKER_VERSION",
+          "PropagateAtLaunch": true,
+          "Value": {
+            "Fn::FindInMap": [
+              "DockerForAWS",
+              "version",
+              "docker"
+            ]
+          }
+        }
+      ],
+      "VPCZoneIdentifier": [
+        {
+          "Fn::If": [
+            "HasOnly2AZs",
+            {
+              "Fn::Join": [
+                ",",
+                [
+                  {
+                    "Ref": "PubSubnetAz1"
+                  },
+                  {
+                    "Ref": "PubSubnetAz2"
+                  }
+                ]
+              ]
+            },
+            {
+              "Fn::Join": [
+                ",",
+                [
+                  {
+                    "Ref": "PubSubnetAz1"
+                  },
+                  {
+                    "Ref": "PubSubnetAz2"
+                  },
+                  {
+                    "Ref": "PubSubnetAz3"
+                  }
+                ]
+              ]
+            }
+          ]
+        }
+      ]
+    }
   ```
 
   * 오토 스케일링을 위한 설정
