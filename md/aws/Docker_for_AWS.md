@@ -923,10 +923,45 @@ AMI로 moby linux를 사용하기 때문에 ssh로 연결 시 user 명이 다른
 
   * 오토 스케일링 그룹의 실행 구성 또는 서브넷 그룹 구성원이 변경되면 롤링 업데이트를 수행하기 위해 AutoPaling 그룹에 UpdatePolicy 특성을 추가할 수 있음.
 
-  * DesiredCapacity : 오토 스케일링 그룹에 대해 원하는 용량을 지정
-    * 오토 스케일링 그룹 SpotPrice에 대한 설정이 있어야 오토 스케일링이 수행된다.
+  * CloudFormation의 CreationPolicy는 해당 리소스를 생성 시 적용하는 정책이다.
 
-  * HealthCheckGracePeriod : 새로운 EC2 인스턴스가 작동 된 후 오토 스케일링이 Health Check를 시작하는 시간(초)
+    * 지정된 개수를 초과하거나 제한 시간을 초과하는 경우 생성을 방지하기 위한 설정
+
+    * 여기서 사용한 ResourceSignal은 리소스 생성 시 성공 신호의 수와 CloudFormation이 해당 리소스를 생성하기까지 기다리는 시간을 설정
+
+      ```json
+      "ManagerSize": {
+        "AllowedValues": [
+          "1",
+          "3",
+          "5"
+        ],
+        "Default": "3",
+        "Description": "Number of Swarm manager nodes (1, 3, 5)",
+        "Type": "Number"
+      }
+      ```
+
+      * 명시된 ManagerSize는 파라미터를 통해 입력 받고, 입력이 없을 경우 3이 기본값이다.
+
+    * Count : 리소스가 실패 신호를 받거나 제한시간이 만료되기 전에 지정된 수의 신호를 수신하지 않으면 리소스 생성이 실패하고 CloudFormation 스택을 롤백
+
+    * Timeout : CloudFormation이 Count 속성에 지정한 신호 수를 기다리는 시간. 지정할 수 있는 최대시간은 12시간
+      * 여기에 명시된 PT20M은 [ISO8601](https://en.wikipedia.org/wiki/ISO_8601#Durations) 형식으로 20분을 의미함.
+      * P는 기간 표현의 시작 부분에 위치한 기간 지정자
+      * T는 시간 구성요소 앞에 오는 시간 지정자
+      * M은 분 단위의 값을 나타내는 분 지정자
+    * 결국 지정된 매니저의 수만큼 리소스를 생성하는데 지정된 수가 20분동안 생성되지 않을 경우 실패로 간주하고 CloudFormation을 롤백한다.
+
+
+* DesiredCapacity : 오토 스케일링 그룹에 대해 원하는 용량을 지정
+
+    * 여기서는 파라미터로 지정된 매니저의 수만큼이 원하는 용량이 됨
+    * 오토 스케일링 그룹 SpotPrice에 대한 설정이 있어야 오토 스케일링이 수행된다.
+      * SpotPrice는 스팟 인스턴스를 사용하기 위한 가격 정책을 의미하는데 스팟 인스턴스는 EC2 인스턴스가 즉시 시작되는 것이 아니라 가용성에 따라 생성되고 종료되는 인스턴스를 의미한다. 
+      * AWS는 온디맨드 인스턴스의 코어 그룹을 시작해서 보장된 컴퓨팅 리소스를 최소로 유지하고 필요 시에 스팟 인스턴스로 보완을 하는 형태를 권장한다.
+
+* HealthCheckGracePeriod : 새로운 EC2 인스턴스가 작동 된 후 오토 스케일링이 Health Check를 시작하는 시간(초)
 
   * HealthCheckType : Health Check를 하길 원하는 서비스 지정.
     * EC2 또는 ELB 지정
@@ -943,29 +978,245 @@ AMI로 moby linux를 사용하기 때문에 ssh로 연결 시 user 명이 다른
 
   * VPCZoneIdentifier : Amazone VPC의 서브넷 식별자 목록
 
+    * AvailabilityZones 속성을 사용하지 않는 경우에는 이 설정을 해주어야함.
+    * 오토 스케일링 시 여기에 명시된 서브넷 리스트 중에 EC2 인스턴스를 생성
 
 
 
 
-## 인터넷 게이트웨이
+### ManagerLaunchConfigAws2
 
-* 수평 확장되고 가용성이 높은 중복 VPC 구성요소
-* VPC의 인스턴스와 인터넷 간에 통신을 할 수 있게 해줌.
-* 네트워크 트래픽에 가용성 위험이나 대역폭 제약 조건이 발생하지 않음
+* 리소스 : AWS::AutoScaling::LaunchConfiguration
 
-
-
-### 목적
-
-* 인터넷 라우팅 가능 트래픽에 대한 VPC 라우팅 테이블에 대상을 제공
-* 퍼블릭 Ipv4 주소가 배정된 인스턴스에 대해 NAT(네트워크 주소 변환)를 수행
-
-
-
-### 인터넷 액세스 활성화
-
-* VPC에 인터넷 게이트웨이 연결
-* 서브넷의 라우팅 테이블이 인터넷 게이트웨이를 가리키는지 확인
-* 서브넷 인스턴스에 전역적으로 고유한 IP 주소가 있는지 확인
-* 네트워크 액세스 제어 및 보안 그룹 규칙에서 적절한 트래픽이 인스턴스로, 그리고 인스턴스에서 흐르도록 허용되는지 확인
+  ```json
+  "ManagerLaunchConfigAws2": {
+    "DependsOn": "ExternalLoadBalancer",
+    "Properties": {
+      "AssociatePublicIpAddress": "true",
+      "BlockDeviceMappings": [
+        {
+          "DeviceName": "/dev/xvdb",
+          "Ebs": {
+            "VolumeSize": {
+              "Ref": "ManagerDiskSize"
+            },
+            "VolumeType": {
+              "Ref": "ManagerDiskType"
+            }
+          }
+        }
+      ],
+      "IamInstanceProfile": {
+        "Ref": "ProxyInstanceProfile"
+      },
+      "ImageId": {
+        "Fn::FindInMap": [
+          "AWSRegionArch2AMI",
+          {
+            "Ref": "AWS::Region"
+          },
+          {
+            "Fn::FindInMap": [
+              "AWSInstanceType2Arch",
+              {
+                "Ref": "ManagerInstanceType"
+              },
+              "Arch"
+            ]
+          }
+        ]
+      },
+      "InstanceType": {
+        "Ref": "ManagerInstanceType"
+      },
+      "KeyName": {
+        "Ref": "KeyName"
+      },
+      "SecurityGroups": [
+        {
+          "Ref": "ManagerVpcSG"
+        },
+        {
+          "Ref": "SwarmWideSG"
+        }
+      ],
+      "UserData": {
+        "Fn::Base64": {
+          "Fn::Join": [
+            "",
+            [
+              "#!/bin/sh\n",
+              "export EXTERNAL_LB='",
+              {
+                "Ref": "ExternalLoadBalancer"
+              },
+              "'\n",
+              "export DOCKER_FOR_IAAS_VERSION='",
+              {
+                "Fn::FindInMap": [
+                  "DockerForAWS",
+                  "version",
+                  "forAws"
+                ]
+              },
+              "'\n",
+              "export LOCAL_IP=$(wget -qO- http://169.254.169.254/latest/meta-data/local-ipv4)\n",
+              "export INSTANCE_TYPE=$(wget -qO- http://169.254.169.254/latest/meta-data/instance-type)\n",
+              "export NODE_AZ=$(wget -qO- http://169.254.169.254/latest/meta-data/placement/availability-zone/)\n",
+              "export NODE_REGION=$(echo $NODE_AZ | sed 's/.$//')\n",
+              "export ENABLE_CLOUDWATCH_LOGS='",
+              {
+                "Ref": "EnableCloudWatchLogs"
+              },
+              "'\n",
+              "export AWS_REGION='",
+              {
+                "Ref": "AWS::Region"
+              },
+              "'\n",
+              "export MANAGER_SECURITY_GROUP_ID='",
+              {
+                "Ref": "ManagerVpcSG"
+              },
+              "'\n",
+              "export WORKER_SECURITY_GROUP_ID='",
+              {
+                "Ref": "NodeVpcSG"
+              },
+              "'\n",
+              "export DYNAMODB_TABLE='",
+              {
+                "Ref": "SwarmDynDBTable"
+              },
+              "'\n",
+              "export STACK_NAME='",
+              {
+                "Ref": "AWS::StackName"
+              },
+              "'\n",
+              "export STACK_ID='",
+              {
+                "Ref": "AWS::StackId"
+              },
+              "'\n",
+              "export ACCOUNT_ID='",
+              {
+                "Ref": "AWS::AccountId"
+              },
+              "'\n",
+              "export VPC_ID='",
+              {
+                "Ref": "Vpc"
+              },
+              "'\n",
+              "export SWARM_QUEUE='",
+              {
+                "Ref": "SwarmSQS"
+              },
+              "'\n",
+              "export CLEANUP_QUEUE='",
+              {
+                "Ref": "SwarmSQSCleanup"
+              },
+              "'\n",
+              "export RUN_VACUUM='",
+              {
+                "Ref": "EnableSystemPrune"
+              },
+              "'\n",
+              "export LOG_GROUP_NAME='",
+              {
+                "Fn::Join": [
+                  "-",
+                  [
+                    {
+                      "Ref": "AWS::StackName"
+                    },
+                    "lg"
+                  ]
+                ]
+              },
+              "'\n",
+              "export ENABLE_EFS='",
+              {
+                "Fn::FindInMap": [
+                  "AWSRegion2AZ",
+                  {
+                    "Ref": "AWS::Region"
+                  },
+                  "EFSSupport"
+                ]
+              },
+              "'\n",
+              "export EFS_ID_REGULAR='",
+              {
+                "Fn::If": [
+                  "EFSSupported",
+                  {
+                    "Ref": "FileSystemGP"
+                  },
+                  ""
+                ]
+              },
+              "'\n",
+              "export EFS_ID_MAXIO='",
+              {
+                "Fn::If": [
+                  "EFSSupported",
+                  {
+                    "Ref": "FileSystemMaxIO"
+                  },
+                  ""
+                ]
+              },
+              "'\n",
+              "export DOCKER_EXPERIMENTAL='true' \n",
+              "export NODE_TYPE='manager'\n",
+              "export INSTANCE_NAME='ManagerAsg'\n",
+              "echo \"$EXTERNAL_LB\" > /var/lib/docker/swarm/lb_name\n",
+              "echo \"# hostname : ELB_name\" >> /var/lib/docker/swarm/elb.config\n",
+              "echo \"127.0.0.1: $EXTERNAL_LB\" >> /var/lib/docker/swarm/elb.config\n",
+              "echo \"localhost: $EXTERNAL_LB\" >> /var/lib/docker/swarm/elb.config\n",
+              "echo \"default: $EXTERNAL_LB\" >> /var/lib/docker/swarm/elb.config\n",
+              "\n",
+              "echo '{\"experimental\": '$DOCKER_EXPERIMENTAL', \"labels\":[\"os=linux\", \"region='$NODE_REGION'\", \"availability_zone='$NODE_AZ'\", \"instance_type='$INSTANCE_TYPE'\", \"node_type='$NODE_TYPE'\"] ' > /etc/docker/daemon.json\n",
+              "if [ $ENABLE_CLOUDWATCH_LOGS == 'yes' ] ; then\n",
+              "   echo ', \"log-driver\": \"awslogs\", \"log-opts\": {\"awslogs-group\": \"'$LOG_GROUP_NAME'\", \"tag\": \"{{.Name}}-{{.ID}}\" }}' >> /etc/docker/daemon.json\n",
+              "else\n",
+              "   echo ' }' >> /etc/docker/daemon.json\n",
+              "fi\n",
+              "\n",
+              "chown -R docker /home/docker/\n",
+              "chgrp -R docker /home/docker/\n",
+              "rc-service docker restart\n",
+              "sleep 5\n",
+              "\n",
+              "docker run --label com.docker.editions.system --log-driver=json-file --restart=no -d -e DYNAMODB_TABLE=$DYNAMODB_TABLE -e NODE_TYPE=$NODE_TYPE -e REGION=$AWS_REGION -e STACK_NAME=$STACK_NAME -e STACK_ID=\"$STACK_ID\" -e ACCOUNT_ID=$ACCOUNT_ID -e INSTANCE_NAME=$INSTANCE_NAME -e DOCKER_FOR_IAAS_VERSION=$DOCKER_FOR_IAAS_VERSION -v /var/run/docker.sock:/var/run/docker.sock -v /usr/bin/docker:/usr/bin/docker -v /var/log:/var/log docker4x/init-aws:$DOCKER_FOR_IAAS_VERSION\n",
+              "\n",
+              "docker run --label com.docker.editions.system --log-driver=json-file --name=guide-aws --restart=always -d -e DYNAMODB_TABLE=$DYNAMODB_TABLE -e NODE_TYPE=$NODE_TYPE -e REGION=$AWS_REGION -e STACK_NAME=$STACK_NAME -e INSTANCE_NAME=$INSTANCE_NAME -e VPC_ID=$VPC_ID -e STACK_ID=\"$STACK_ID\" -e ACCOUNT_ID=$ACCOUNT_ID -e SWARM_QUEUE=\"$SWARM_QUEUE\" -e CLEANUP_QUEUE=\"$CLEANUP_QUEUE\" -e RUN_VACUUM=$RUN_VACUUM -e DOCKER_FOR_IAAS_VERSION=$DOCKER_FOR_IAAS_VERSION -v /var/run/docker.sock:/var/run/docker.sock -v /usr/bin/docker:/usr/bin/docker docker4x/guide-aws:$DOCKER_FOR_IAAS_VERSION\n",
+              "\n",
+              "docker volume create --name sshkey\n",
+              "\n",
+              "docker run --label com.docker.editions.system --log-driver=json-file -ti --rm --user root -v sshkey:/etc/ssh --entrypoint ssh-keygen docker4x/shell-aws:$DOCKER_FOR_IAAS_VERSION -A\n",
+              "\n",
+              "docker run --label com.docker.editions.system --log-driver=json-file --name=shell-aws --restart=always -d -p 22:22 -v /home/docker/:/home/docker/ -v /var/run/docker.sock:/var/run/docker.sock -v /var/lib/docker/swarm/lb_name:/var/lib/docker/swarm/lb_name:ro -v /var/lib/docker/swarm/elb.config:/var/lib/docker/swarm/elb.config -v /usr/bin/docker:/usr/bin/docker -v /var/log:/var/log -v sshkey:/etc/ssh -v /etc/passwd:/etc/passwd:ro -v /etc/shadow:/etc/shadow:ro -v /etc/group:/etc/group:ro docker4x/shell-aws:$DOCKER_FOR_IAAS_VERSION\n",
+              "\n",
+              "if [ $ENABLE_EFS == 'yes' ] ; then\n",
+              "    docker plugin install --alias cloudstor:aws --grant-all-permissions docker4x/cloudstor:$DOCKER_FOR_IAAS_VERSION CLOUD_PLATFORM=AWS EFS_ID_REGULAR=$EFS_ID_REGULAR EFS_ID_MAXIO=$EFS_ID_MAXIO DEBUG=1\n",
+              "fi\n",
+              "docker run --label com.docker.editions.system --log-driver=json-file --name=meta-aws --restart=always -d -p $LOCAL_IP:9024:8080 -e AWS_REGION=$AWS_REGION -e MANAGER_SECURITY_GROUP_ID=$MANAGER_SECURITY_GROUP_ID -e WORKER_SECURITY_GROUP_ID=$WORKER_SECURITY_GROUP_ID -v /var/run/docker.sock:/var/run/docker.sock docker4x/meta-aws:$DOCKER_FOR_IAAS_VERSION metaserver -iaas_provider=aws\n",
+              "docker run --label com.docker.editions.system --log-driver=json-file --name=l4controller-aws --restart=always -d -v /var/run/docker.sock:/var/run/docker.sock -v /var/lib/docker/swarm:/var/lib/docker/swarm docker4x/l4controller-aws:$DOCKER_FOR_IAAS_VERSION run --log=4 --all=true\n"
+            ]
+          ]
+        }
+      }
+    },
+    "Type": "AWS::AutoScaling::LaunchConfiguration"
+  }
+  ```
+  * EC2 인스턴스를 오토스케일링 그룹에서 구동시키기 위해 필요한 설정들을 지정한다.
+    * EBS 볼륨
+    * 파라미터로 받은 값에 의한 AMI, 보안그룹, 키 쌍 등의 값을 설정
+  * 여기서 중요한 부분은 EC2 인스턴스를 구동시킬 때 실행되는 스크립트인 UserData 속성
+    * ​
 
