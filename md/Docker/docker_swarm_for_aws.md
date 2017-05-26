@@ -1,5 +1,10 @@
 # docker swarm for aws
 
+### awscli 설정
+
+* `~/.aws/credentials`에서 ACCESS_KEY와 SECRET_KEY 설정
+* `~/.aws/config`에서 default region 설정
+
 ### ec2 인스턴스 생성
 
 * shell 명령 시 사용할 변수 설정
@@ -18,7 +23,23 @@
   $ docker-machine create -d amazonec2 --amazonec2-vpc-id $VPC --amazonec2-region $REGION --amazonec2-zone $ZONE --amazonec2-instance-type t2.micro --amazonec2-subnet-id $SUBNET --amazonec2-security-group $SECURITY_GROUP_NAME test-swarm-manager
   ```
 
-  * docker-machine create 명령을 통해 드라이버를 amazonec2를 선택하여 EC2 인스턴스를 생성하는 경우 뒤에 오는 설정들을 적용한 EC2 인스턴스가 만들어지고 기본적으로 docker까지 설치가 된다.
+  * docker-machine create 명령을 통해 [드라이버를 amazonec2를 선택하여 EC2 인스턴스를 생성](https://docs.docker.com/machine/drivers/aws/)하는 경우 뒤에 오는 설정들을 적용한 EC2 인스턴스가 만들어지고 기본적으로 docker까지 설치가 된다.
+
+  * 위 명령으로 ec2 instance 를 생성하면 각각의 인스턴스마다 ssh 키가 발급된다. 
+
+    * ~/.docker/machine/machines/\<ec2인스턴스명\> 위치에 키 생성
+
+  * 같은 키를 통해 인스턴스를 생성하려면 위 명령에서 아래 옵션 추가
+
+    ```shell
+    --amazonec2-ssh-keypath ~/.docker/machine/machines/<ec2인스턴스명>/id_rsa
+    ```
+
+  * 미리 생성해 둔 AMI를 사용하여 인스턴스를 생성하려면 아래 옵션 추가
+
+    ```shell
+    --amazonec2-ami <AMI ID>
+    ```
 
   * 아래와 같은 생성 절차를 수행하기 때문에 꽤 오랜 시간이 소요된다.
 
@@ -124,17 +145,3 @@
   777i9r3g0dy9b0ozwyovhjwm1 *  test-swarm-manager   Ready   Active        Leader
   p8qqhwexf409eq51s3zxdkvi4    test-swarm-node      Ready   Active
   ```
-
-
-
-### AWS 오토스케일링 정책
-
-* swarm에서 사용할 이미지들의 registry는 AWS ECR 사용
-  * 현재는 Seoul 리전에 ECR 서비스가 없으므로 Tokyo 사용
-  * 이 때 ECR에 로그인 하기 위해 awscli가 필요
-  * 이를 위해 초기 구성으로 awscli 설치와 ECR 로그인까지 마친 VM을 AMI로 생성
-* 오토 스케일링 시 위에서 만든 AMI를 사용하여 EC2 인스턴스를 생성하고 UserData 스크립트를 통해 swarm manager 노드에 join
-  * 미리 스크립트에 넣을 수 있도록 join 명령이 필요
-  * 이를 위해 manager를 초기화하여 join 이 가능한 AMI를 생성해둠
-  * 오토 스케일링 될 worker들은 UserData 스크립트를 통해 manager node에 조인
-* 오케스케일링이 완료 되면 scale 명령으로 서비스 확장
