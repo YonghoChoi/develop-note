@@ -77,6 +77,46 @@
 
 
 
+
+## 이미지 업데이트 절차
+
+1. 호스트에서 업데이트할 tomcat 컨테이너 구동
+
+2. 구동된 tomcat 컨테이너에 업데이트 내용 적용
+
+3. logs 디렉토리의 내용 모두 제거
+
+4. docker commit
+
+   ```shell
+   $ docker commit <컨테이너ID> 138011803946.dkr.ecr.ap-northeast-1.amazonaws.com/hive-tomcat:<버젼>
+   ```
+
+   * 버젼은 redmine의 wiki 페이지 참조
+
+5. docker push
+
+   ```shell
+   $ docker push 138011803946.dkr.ecr.ap-northeast-1.amazonaws.com/hive-tomcat:<버젼>
+   ```
+
+6. latest 갱신
+
+   ```shell
+   $ docker tag 138011803946.dkr.ecr.ap-northeast-1.amazonaws.com/hive-tomcat:<버젼> 138011803946.dkr.ecr.ap-northeast-1.amazonaws.com/hive-tomcat:latest
+   $ docker push 138011803946.dkr.ecr.ap-northeast-1.amazonaws.com/hive-tomcat:latest
+   ```
+
+7. AWS의 manager EC2 인스턴스로 접속한 후 update 명령
+
+   ```shell
+   $ sudo docker service update --image 138011803946.dkr.ecr.ap-northeast-1.amazonaws.com/hive-tomcat:latest hive-server
+   ```
+
+   * 업데이트 시 latest보다 해당 버젼으로 명시하면 visualizer에서 현재 버젼을 확인할 수 있어서 좋음.
+
+
+
 ### 추가로 해야되는 작업
 
 * 오토스케일링 그룹 지정
@@ -87,6 +127,11 @@
 * swarm에서 특정 노드의 컨테이너 종료 가능한지 검토
 * 컨테이너 종료 시 스크립트 수행가능한지 검토
   * filebeat 정상 종료 되도록 스크립트로 체크
+* 이미지 업데이트 과정 jenkins로 자동화
+* EC2 인스턴스 terminate 시 스크립트 실행 가능 여부 검토
+  * linux의 shutdown 시 script 실행으로 찾아보는 것이 나을 듯
+
+
 
 
 
@@ -101,18 +146,3 @@
   - 이를 위해 manager를 초기화하여 join 이 가능한 AMI를 생성해둠
   - 오토 스케일링 될 worker들은 UserData 스크립트를 통해 manager node에 조인
 - 오케스케일링이 완료 되면 scale 명령으로 서비스 확장
-
-
-
-### Hive 서비스 생성
-
-* manager 노드에서 create
-
-  ```shell
-  $ sudo docker service create --name hive-server --publish 8080:8080 --with-registry-auth 138011803946.dkr.ecr.ap-northeast-1.amazonaws.com/hive-tomcat:latest
-  ```
-
-  * ECR에서 이미지를 가져와서 서비스를 생성하기 위해 —with-registry-auty 옵션을 주어야 한다.
-    * 이 옵션은 registry에 대한 인증 정보를 에이전트들에게 전달한다.
-
-* ​
