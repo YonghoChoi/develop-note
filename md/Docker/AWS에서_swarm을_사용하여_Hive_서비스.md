@@ -130,6 +130,7 @@
 * 이미지 업데이트 과정 jenkins로 자동화
 * EC2 인스턴스 terminate 시 스크립트 실행 가능 여부 검토
   * linux의 shutdown 시 script 실행으로 찾아보는 것이 나을 듯
+* swarm에서 볼륨 지정하여 사용하는 방법 숙지
 
 
 
