@@ -46,7 +46,7 @@
 * NFS 서버의 보안 그룹
   ![](images/nfs_3.png)
   * Source를 NFS 클라이언트의 보안그룹으로 지정하여 NFS 클라이언트 보안 그룹이 적용된 EC2 인스턴스에서만 접근 가능하도록 함
-  
+
 ## NFS 서버와 볼륨
 
 * NFS 서버용 인스턴스는 인스턴스 스토어를 제공하는 유형이어야 한다.
@@ -58,12 +58,23 @@
   #!/bin/bash -ex
   apt-get update
   apt-get install nfs-kernel-server
+  mkdir /var/nfs/general -p
+  chown nobody:nogroup /var/nfs/general
+  chmod 777 /var/nfs/general
+  echo "/var/nfs/general *(rw,sync,no_subtree_check)" >> /etc/exports
+  systemctl restart nfs-kernel-server
   ```
 * NFS 클라이언트 구동 시 UserData
   ```shell
   #!/bin/bash -ex
   apt-get install -y nfs-common
-  mkdir /mnt/nfs
-  echo "13.124.67.163:/mnt/shared /mnt/nfs nfs rw 0 0" >> /etc/fstab
-  mount -a
+  mkdir -p /nfs/general
+  mount <NFS 서버 IP>:/var/nfs/general /nfs/general
   ```
+
+
+
+## 참고
+
+* [NFS 서버/클라 설치](https://www.digitalocean.com/community/tutorials/how-to-set-up-an-nfs-mount-on-ubuntu-16-04)
+* [docker volume 생성 및 마운트](https://github.com/moby/moby/issues/25202)
