@@ -159,6 +159,159 @@
 
 
 
+
+### 로그 파일 저장 정책
+
+#### 고려 사항
+
+1. EFS를 사용하여 EC2 인스턴스 간 공유 디렉토리 사용
+   - EFS는 서울, 도쿄 리전 서비스 없음
+   - 가격이 EBS보다 세배 가량 비쌈
+2. EC2 인스턴스 간 NFS를 통해 파일 공유
+   - EC2 인스턴스 하나가 NFS Server가 되므로 해당 인스턴스에 장애가 생기면 모든 서버에 문제가 발생할 수 있음
+3. 각 EC2 인스턴스에 구동되고 있는 컨테이너에 대한 로그 저장
+
+
+
+#### 각 EC2 인스턴스에 구동되고 있는 컨테이너에 로그 저장
+
+* 위 세가지 고려사항 중 3번으로 결정
+  * swarm의 service를 수행하는 각 머신 별로 로그를 남긴다.
+
+- swarm의 각 컨테이너별로 볼륨을 지정할 수는 없고 서비스 단위로 볼륨이 정해지기 때문에 특정 디렉토리를 mount하면 동일한 이름의 로그인 경우 덮어써짐.
+
+  - tomcat의 로그와 logback을 통한 로그 모두 파일 명에 hostname을 포함하는 방식으로 개별 파일이 생성되도록 해야함.
+
+- tomcat 로그 파일명 변경 방법
+
+  - tomcat의 conf 디렉토리에 있는 logging.properties파일은 글로벌 설정이므로 등록된 모든 어플리케이션에 적용된다.
+
+  - 개별 어플리케이션의 WEB-INF/classes/ 하위에 logging.properties를 두고 설정하면 해당 어플리케이션에만 설정이 적용된다.
+
+  - 이 때 글로벌과 중복되게 설정을 하는 경우 로그 파일이 두개가 생성되므로 글로벌 설정을 수정해주어야 한다.
+
+    - 글로벌 설정에서 각 파일 핸들러 설정을 제거하여 로그 파일이 생성되지 않도록 설정
+
+  - tomcat/conf/logging.properties
+
+    ```properties
+    handlers = java.util.logging.ConsoleHandler
+    .handlers = java.util.logging.ConsoleHandler
+
+    java.util.logging.ConsoleHandler.level = FINE
+    java.util.logging.ConsoleHandler.formatter = org.apache.juli.OneLineFormatter
+    ```
+
+  - 개별 어플리케이션의 WEB-INF/classes/logging.properties
+
+    ```properties
+    handlers = 1catalina.org.apache.juli.AsyncFileHandler, 2localhost.org.apache.juli.AsyncFileHandler, 3manager.org.apache.juli.AsyncFileHandler, 4host-manager.org.apache.juli.AsyncFileHandler, java.util.logging.ConsoleHandler
+
+    .handlers = 1catalina.org.apache.juli.AsyncFileHandler, java.util.logging.ConsoleHandler
+
+    ############################################################
+    # Handler specific properties.
+    # Describes specific configuration info for Handlers.
+    ############################################################
+
+    1catalina.org.apache.juli.AsyncFileHandler.level = FINE
+    1catalina.org.apache.juli.AsyncFileHandler.directory = ${catalina.base}/logs
+    1catalina.org.apache.juli.AsyncFileHandler.prefix = catalina.${classloader.hostName}.
+
+    2localhost.org.apache.juli.AsyncFileHandler.level = FINE
+    2localhost.org.apache.juli.AsyncFileHandler.directory = ${catalina.base}/logs
+    2localhost.org.apache.juli.AsyncFileHandler.prefix = localhost.${classloader.hostName}.
+
+    3manager.org.apache.juli.AsyncFileHandler.level = FINE
+    3manager.org.apache.juli.AsyncFileHandler.directory = ${catalina.base}/logs
+    3manager.org.apache.juli.AsyncFileHandler.prefix = manager.${classloader.hostName}.
+
+    4host-manager.org.apache.juli.AsyncFileHandler.level = FINE
+    4host-manager.org.apache.juli.AsyncFileHandler.directory = ${catalina.base}/logs
+    4host-manager.org.apache.juli.AsyncFileHandler.prefix = host-manager.${classloader.hostName}.
+
+    java.util.logging.ConsoleHandler.level = FINE
+    java.util.logging.ConsoleHandler.formatter = org.apache.juli.OneLineFormatter
+
+
+    ############################################################
+    # Facility specific properties.
+    # Provides extra control for each logger.
+    ############################################################
+
+    org.apache.catalina.core.ContainerBase.[Catalina].[localhost].level = INFO
+    org.apache.catalina.core.ContainerBase.[Catalina].[localhost].handlers = 2localhost.org.apache.juli.AsyncFileHandler
+
+    org.apache.catalina.core.ContainerBase.[Catalina].[localhost].[/manager].level = INFO
+    org.apache.catalina.core.ContainerBase.[Catalina].[localhost].[/manager].handlers = 3manager.org.apache.juli.AsyncFileHandler
+
+    org.apache.catalina.core.ContainerBase.[Catalina].[localhost].[/host-manager].level = INFO
+    org.apache.catalina.core.ContainerBase.[Catalina].[localhost].[/host-manager].handlers = 4host-manager.org.apache.juli.AsyncFileHandler
+    ```
+
+    * swarm을 통해 같은 볼륨에 로그가 쌓일 경우 파일이 덮어쓰여지지 않도록 파일명 prefix에 호스트명 추가
+      * catalina.${classloader.hostName}.
+
+  - 하지만 이 방법대로 했더니만 파일명은 제대로 바뀌는데 아래와 같은 TLD 관련 메시지가 남으면서 애플리케이션의 로그가 남지 않는 문제가 발생. 
+
+    ```
+    30-May-2017 10:46:46.735 정보 [localhost-startStop-1] org.apache.jasper.servlet.TldScanner.scanJars At least one JAR was scanned for TLDs yet contained no TLDs. Enable debug logging for this logger for a complete list of JARs that were scanned but no TLDs were found in them. Skipping unneeded JARs during scanning can improve startup time and JSP compilation time.
+    ```
+
+  - 그래서 톰캣 구동 시 인자로 호스트명을 전달 받아서 logging.properties에서 인자를 참조하여 파일명을 변경하는 방식으로 결정
+
+    - bin/catalina.sh 파일을 수정하여 JAVA_OPTS에 호스트명 전달
+
+      ```
+      -Dcustom.hostname=$HOSTNAME
+      ```
+
+    - conf/logging.properties 파일을 수정하여 각 로그 파일 경로에 호스트명 추가
+
+      ```
+      1catalina.org.apache.juli.AsyncFileHandler.prefix = catalina.${custom.hostname}.
+      ```
+
+    - 그러면 야래와 같이 호스트명을 포함한 로그 파일이 생성됨.
+
+      ```
+      catalina.17b163c2c43c.2017-05-30.log
+      ```
+
+- logback 로그 파일명 변경 방법
+
+  - Servlet 초기화 시 호스트명과 현재 날짜 기록
+
+    ```java
+    try {
+        System.setProperty("hostName", InetAddress.getLocalHost().getHostName());
+        System.setProperty("currentDate", DateTimeHelper.getNowDate("yyyy-MM-dd"));
+    } catch (UnknownHostException e) {
+        System.out.println("Error Message : " + e.getMessage());
+        e.printStackTrace();
+    }
+    ```
+
+  - logback.xml 파일에 파일 패턴 설정
+
+    ```xml
+    <appender name="DEBUG" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        ...
+        <file>Log/debug-${hostName}-${currentDate}.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!-- rollover daily -->
+            <fileNamePattern>Log/debug-${hostName}-%d{yyyy-MM-dd_HH-mm-ss}.%i.txt</fileNamePattern>
+            ...
+        </rollingPolicy>
+        ...
+    </appender>
+    ```
+
+    * ${hostName}과 ${currentDate}는 위 자바 코드에서 System Property에 저장한 값
+
+
+
+
 ### 추가로 해야되는 작업
 
 - 오토스케일링 그룹 지정
@@ -173,13 +326,5 @@
 - EC2 인스턴스 terminate 시 스크립트 실행 가능 여부 검토
   - linux의 shutdown 시 script 실행으로 찾아보는 것이 나을 듯
 - swarm에서 볼륨 지정하여 사용하는 방법 숙지
-- swarm에서 로그 파일 저장 정책 결정
-  - EFS를 사용하여 EC2 인스턴스 간 공유 디렉토리 사용
-    - EFS는 서울, 도쿄 리전 서비스 없음
-    - 가격이 EBS보다 세배 가량 비쌈
-  - EC2 인스턴스 간 NFS를 통해 파일 공유
-    - EC2 인스턴스 하나가 NFS Server가 되므로 해당 인스턴스에 장애가 생기면 모든 서버에 문제가 발생할 수 있음
-  - 각 EC2 인스턴스에 구동되고 있는 컨테이너에 대한 로그 저장
-    - swarm의 각 컨테이너별로 볼륨을 지정할 수는 없고 서비스 단위로 볼륨이 정해지기 때문에 특정 디렉토리를 mount하면 동일한 이름의 로그인 경우 덮어써짐.
-    - tomcat의 로그와 logback을 통한 로그 모두 파일 명에 hostname을 포함하는 방식으로 개별 파일이 생성되도록 해야함.
+- ~~swarm에서 로그 파일 저장 정책 결정~~
 
