@@ -232,33 +232,34 @@
 
     java.util.logging.ConsoleHandler.level = FINE
     java.util.logging.ConsoleHandler.formatter = org.apache.juli.OneLineFormatter
+    ```
 
 
     ############################################################
     # Facility specific properties.
     # Provides extra control for each logger.
     ############################################################
-
+    
     org.apache.catalina.core.ContainerBase.[Catalina].[localhost].level = INFO
     org.apache.catalina.core.ContainerBase.[Catalina].[localhost].handlers = 2localhost.org.apache.juli.AsyncFileHandler
-
+    
     org.apache.catalina.core.ContainerBase.[Catalina].[localhost].[/manager].level = INFO
     org.apache.catalina.core.ContainerBase.[Catalina].[localhost].[/manager].handlers = 3manager.org.apache.juli.AsyncFileHandler
-
+    
     org.apache.catalina.core.ContainerBase.[Catalina].[localhost].[/host-manager].level = INFO
     org.apache.catalina.core.ContainerBase.[Catalina].[localhost].[/host-manager].handlers = 4host-manager.org.apache.juli.AsyncFileHandler
-    ```
-
+    ​```
+    
     * swarm을 통해 같은 볼륨에 로그가 쌓일 경우 파일이 덮어쓰여지지 않도록 파일명 prefix에 호스트명 추가
       * catalina.${classloader.hostName}.
 
-  - 하지만 이 방법대로 했더니만 파일명은 제대로 바뀌는데 아래와 같은 TLD 관련 메시지가 남으면서 애플리케이션의 로그가 남지 않는 문제가 발생. 
+-   하지만 이 방법대로 했더니만 파일명은 제대로 바뀌는데 아래와 같은 TLD 관련 메시지가 남으면서 애플리케이션의 로그가 남지 않는 문제가 발생. 
 
     ```
     30-May-2017 10:46:46.735 정보 [localhost-startStop-1] org.apache.jasper.servlet.TldScanner.scanJars At least one JAR was scanned for TLDs yet contained no TLDs. Enable debug logging for this logger for a complete list of JARs that were scanned but no TLDs were found in them. Skipping unneeded JARs during scanning can improve startup time and JSP compilation time.
     ```
 
-  - 그래서 톰캣 구동 시 인자로 호스트명을 전달 받아서 logging.properties에서 인자를 참조하여 파일명을 변경하는 방식으로 결정
+- 그래서 톰캣 구동 시 인자로 호스트명을 전달 받아서 logging.properties에서 인자를 참조하여 파일명을 변경하는 방식으로 결정
 
     - bin/catalina.sh 파일을 수정하여 JAVA_OPTS에 호스트명 전달
 
@@ -266,16 +267,16 @@
       -Dcustom.hostname=$HOSTNAME
       ```
 
-    - conf/logging.properties 파일을 수정하여 각 로그 파일 경로에 호스트명 추가
+    - conf/logging.properties 파일을 수정하여 각 로그 파일 경로의 호스트명으로 된 디렉토리 안에 분류 보관
 
       ```
-      1catalina.org.apache.juli.AsyncFileHandler.prefix = catalina.${custom.hostname}.
+      1catalina.org.apache.juli.AsyncFileHandler.directory = ${catalina.base}/logs/${custom.hostname}.
       ```
 
-    - 그러면 야래와 같이 호스트명을 포함한 로그 파일이 생성됨.
+    - 그러면 야래와 같이 호스트명의 디렉토리에 로그 파일이 생성됨.
 
       ```
-      catalina.17b163c2c43c.2017-05-30.log
+      /usr/local/tomcat/logs/17b163c2c43c/catalina.2017-05-30.log
       ```
 
 - logback 로그 파일명 변경 방법
@@ -285,7 +286,6 @@
     ```java
     try {
         System.setProperty("hostName", InetAddress.getLocalHost().getHostName());
-        System.setProperty("currentDate", DateTimeHelper.getNowDate("yyyy-MM-dd"));
     } catch (UnknownHostException e) {
         System.out.println("Error Message : " + e.getMessage());
         e.printStackTrace();
@@ -297,17 +297,17 @@
     ```xml
     <appender name="DEBUG" class="ch.qos.logback.core.rolling.RollingFileAppender">
         ...
-        <file>Log/debug-${hostName}-${currentDate}.log</file>
+        <file>/usr/local/tomcat/logs/${hostName}/debug.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
             <!-- rollover daily -->
-            <fileNamePattern>Log/debug-${hostName}-%d{yyyy-MM-dd_HH-mm-ss}.%i.txt</fileNamePattern>
+            <fileNamePattern>/usr/local/tomcat/logs/${hostName}/debug-%d{yyyy-MM-dd_HH-mm-ss}.%i.txt</fileNamePattern>
             ...
         </rollingPolicy>
         ...
     </appender>
     ```
 
-    * ${hostName}과 ${currentDate}는 위 자바 코드에서 System Property에 저장한 값
+    * ${hostName}은 위 자바 코드에서 System Property에 저장한 값
 
 
 
