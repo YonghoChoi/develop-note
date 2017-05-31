@@ -62,7 +62,10 @@ AWS의 각 리소스들에 접근하고 사용을 하기 위해서는 awscli가 
 * manager 인스턴스 생성
 
   ```shell
-  $ docker-machine create -d amazonec2 --amazonec2-vpc-id $VPC --amazonec2-region $REGION --amazonec2-zone $ZONE --amazonec2-instance-type t2.micro --amazonec2-subnet-id $SUBNET --amazonec2-security-group $SECURITY_GROUP_NAME test-swarm-manager
+  $ docker-machine create -d amazonec2 --amazonec2-vpc-id \
+    $VPC --amazonec2-region $REGION --amazonec2-zone $ZONE \
+    --amazonec2-instance-type t2.micro --amazonec2-subnet-id $SUBNET \
+    --amazonec2-security-group $SECURITY_GROUP_NAME test-swarm-manager
   ```
 
   * docker-machine create 명령을 통해 [드라이버를 amazonec2를 선택하여 EC2 인스턴스를 생성](https://docs.docker.com/machine/drivers/aws/)하는 경우 뒤에 오는 설정들을 적용한 EC2 인스턴스가 만들어지고 **기본적으로 docker까지 설치**가 된다.
@@ -106,7 +109,10 @@ AWS의 각 리소스들에 접근하고 사용을 하기 위해서는 awscli가 
 * worker node 인스턴스 생성
 
   ```shell
-  $ docker-machine create -d amazonec2 --amazonec2-vpc-id $VPC --amazonec2-region $REGION --amazonec2-zone $ZONE --amazonec2-instance-type t2.micro --amazonec2-subnet-id $SUBNET --amazonec2-security-group $SECURITY_GROUP_NAME test-swarm-node
+  $ docker-machine create -d amazonec2 --amazonec2-vpc-id $VPC \
+    --amazonec2-region $REGION --amazonec2-zone $ZONE \
+    --amazonec2-instance-type t2.micro --amazonec2-subnet-id $SUBNET \
+    --amazonec2-security-group $SECURITY_GROUP_NAME test-swarm-node
   ```
 
 
@@ -155,11 +161,16 @@ AWS의 각 리소스들에 접근하고 사용을 하기 위해서는 awscli가 
 
   ```shell
   $ SECURITY_GROUP_ID=sg-?? # 위에서 획득한 보안 그룹 고유 ID
-  $ aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID --protocol tcp --port 2377 --source-group $SECURITY_GROUP_ID
-  $ aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID --protocol tcp --port 7946 --source-group $SECURITY_GROUP_ID
-  $ aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID --protocol udp --port 7946 --source-group $SECURITY_GROUP_ID
-  $ aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID --protocol tcp --port 4789 --source-group $SECURITY_GROUP_ID
-  $ aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID --protocol udp --port 4789 --source-group $SECURITY_GROUP_ID
+  $ aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID \
+    --protocol tcp --port 2377 --source-group $SECURITY_GROUP_ID
+  $ aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID \
+    --protocol tcp --port 7946 --source-group $SECURITY_GROUP_ID
+  $ aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID \
+    --protocol udp --port 7946 --source-group $SECURITY_GROUP_ID
+  $ aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID \
+    --protocol tcp --port 4789 --source-group $SECURITY_GROUP_ID
+  $ aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID \
+    --protocol udp --port 4789 --source-group $SECURITY_GROUP_ID
   ```
 
   * authorize-security-group-ingress 명령을 사용하면 보안 그룹에 수신 규칙을 추가한다.
