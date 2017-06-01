@@ -60,6 +60,24 @@
      --replicas 3
      ```
 
+   *  볼륨 지정을 하려면 각 머신에 볼륨으로 지정할 디렉토리가 생성되어 있어야 한다.
+
+      ```shell
+      --mount type=bind,src=<HOST_PATH>,dst=<CONTAINER-PATH>
+      ```
+
+   * 한 머신에 너무 많은 컨테이너가 구동되지 않도록 제한을 주기 위해 —reserve-cpu 옵션 사용
+
+     * CPU 하나 당 컨테이너 하나
+
+       ```shell
+       --reserve-cpu 1
+       ```
+
+     * **이를 사용하면 오토스케일링이 가능해짐.**
+
+     * 미리 scale을 넉넉히 늘려 놓은 후 EC2의 오토스케일링을 통해 worker가 매니저로 join하게 되면 늘어난 CPU 수 만큼 서비스의 개수도 늘어나게 된다.
+
 6. scale in/out 테스트
 
    ```shell
@@ -309,6 +327,41 @@
 
     * ${hostName}은 위 자바 코드에서 System Property에 저장한 값
 
+
+
+
+## 이슈
+
+### webapps 하위의 deploy된 디렉토리가 제거되는 문제
+
+* 문제 발생
+  * Hive.war 파일을 webapps 디렉토리 하위에 넣어두면 autoDeploy 기능으로 인해 자동으로 압축이 해제되고 Hive 디렉토리가 생성된다.
+  * 이 때 Hive.war 파일을 제거하고 tomcat을 재시작하면 Hive 디렉토리가 제거된다.
+
+* 원인
+
+  * autoDeploy 기능으로 인해 생성된 디렉토리는 내부적으로 war파일과 연결된 확장 디렉토리로써 관리가 된다. 
+  * WAR 파일을 삭제하면 연결된 확장 디렉토리, 컨텍스트 파일 및 작업 디렉토리가 제거 된 상태에서 응용 프로그램의 배포가 해제되고, 현재 사용자 세션 또한 유지되지 않는다.
+
+* 해결
+
+  * conf/server.xml에서 autoDeploy 속성을 false로 지정하여 수동으로 배포하도록 설정
+
+    ```xml
+    <Host name="localhost"  appBase="webapps"
+                unpackWARs="true" autoDeploy="false">
+    ```
+
+  * webapps 디렉토리 하위에 unzip을 통해 war 파일을 배포
+
+    ```shell
+    $ unzip -d /usr/local/tomcat/webapps/Hive Hive.war
+    ```
+
+* 참고
+
+  * https://serverfault.com/questions/192784/why-does-tomcat-like-deleting-my-context-xml-file
+  * http://tomcat.apache.org/tomcat-6.0-doc/config/host.html#Automatic%20Application%20Deployment
 
 
 
