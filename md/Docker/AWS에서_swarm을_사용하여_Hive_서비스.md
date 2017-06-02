@@ -6,6 +6,12 @@
 
    * manager 노드는 docker-swarm-manager AMI 사용
 
+     * manager AMI에는 docker swarm init 명령을 통해 swarm 구성이 되어있다.
+
+       ```shell
+       $ docker swarm init --advertise-addr <manager 인스턴스의 내부 IP>
+       ```
+
      * 실서비스에는 기본 3개로 지정
 
    * worker 노드는 docker-swarm-for-aws AMI 사용
@@ -18,7 +24,8 @@
 
        ```shell
        #!/bin/bash
-       docker swarm join --token SWMTKN-1-42hrtbs9zwam7n3oez6dy5wmrnywjmm0ndfxtppk67xalchwwq-0yhly80f0rhfqbch6rqm15hwn <manager의 내부 IP>:2377
+       $(aws ecr get-login --region ap-northeast-1)
+       docker swarm join --token SWMTKN-1-19qqs4w5nf1t59rnebr1x3xu82kzrzk0m4454o4m4ezmtmotl5-6l0w196grl7vr2pehh294dwmm <manager의 내부 IP>:2377
        ```
 
        ​
@@ -48,7 +55,7 @@
 5. manager 노드에서 tomcat 서비스 생성
 
    ```shell
-   $ sudo docker service create --name hive-server --publish 8080:8080 --with-registry-auth 138011803946.dkr.ecr.ap-northeast-1.amazonaws.com/hive-tomcat:latest
+   $ sudo docker service create --name hive-server --publish 8080:8080 --mount type=bind,src=/home/ubuntu/logs,dst=/usr/local/tomcat/logs --reserve-cpu 1 --with-registry-auth 138011803946.dkr.ecr.ap-northeast-1.amazonaws.com/hive-tomcat:latest
    ```
 
    * ECR에서 이미지를 가져와서 서비스를 생성하기 위해 —with-registry-auty 옵션을 주어야 한다.
@@ -60,7 +67,7 @@
      --replicas 3
      ```
 
-   *  볼륨 지정을 하려면 각 머신에 볼륨으로 지정할 디렉토리가 생성되어 있어야 한다.
+   * 볼륨 지정을 하려면 각 머신에 볼륨으로 지정할 디렉토리가 생성되어 있어야 한다.
 
       ```shell
       --mount type=bind,src=<HOST_PATH>,dst=<CONTAINER-PATH>
