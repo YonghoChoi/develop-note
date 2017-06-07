@@ -91,7 +91,7 @@
 
 * host 설정
 
-  * 초기 구성
+  * Case1 : filebeat를 beanstalk 환경 구축 시 내려 받고 설치
 
     ```yaml
     commands:
@@ -105,7 +105,7 @@
     * log 수집을 위해 filebeat 설치
     * 오토 스케일링 시 매번 패키지를 설치해야 되므로 설치 관련된 부분은 미리 구성을 해 놓은 상태로 AMI를 사용하는 방식으로 변경
 
-  * AMI를 미리 구성하고 EC2 인스턴스가 구동될 때 S3에서 설정 파일을 받아서 기존 설정 파일을 덮어씌운 후 서비스 실행
+  * Case2 : 필요한 패키지를 설치한 후 AMI를 미리 구성하고 EC2 인스턴스가 구동될 때 S3에서 설정 파일을 받아서 기존 설정 파일을 덮어씌운 후 서비스 실행
 
     * S3에 버킷 생성 후 ebextensions에서 접근 권한 설정 후 다운로드
 
@@ -114,13 +114,32 @@
         AWSEBAutoScalingGroup:
           Metadata:
             AWS::CloudFormation::Authentication:
-              S3Auth:
-                type: "s3"
-                buckets: ["hive-configurations"]
-                roleName: s3-ready-only
+              S3Access:
+                type: S3
+                roleName: aws-elasticbeanstalk-ec2-role
+                buckets: hive-configurations
       files:
        /etc/filebeat/filebeat.yml:
           source: https://s3.ap-northeast-2.amazonaws.com/hive-configurations/filebeat.yml
+          authentication: S3Access
+      ```
+
+      * roleName에 해당하는 aws-elasticbeanstalk-ec2-role 설정에 S3에 대한 읽기 권한이 필요하다.
+
+      * role 확인을 위해 IAM의 Roles를 선택
+
+        ![](images/beanstalk_7.png)
+
+      * aws-elasticbeanstalk-ec2-role에 S3 읽기 권한 정책 추가
+
+        ![](images/beanstalk_8.png)
+
+    * ebextensions 디렉토리에 filebeat.yml을 넣은 채로 배포하여 beanstalk 구동 시 복사
+
+      ```yaml
+      container_commands:
+        cp-filebeat-config:
+          command: cp .ebextensions/filebeat.yml /etc/filebeat/filebeat.yml
       ```
 
       ​
@@ -146,16 +165,48 @@
 ### GUI 환경
 
 1. Elastic Beanstalk 서비스 선택
+
+   ![](images/beanstalk_2.png)
+
 2. Application 선택
+
+   ![](images/beanstalk_3.png)
+
 3. Configuration 선택
+
+   ![](images/beanstalk_4.png)
+
 4. Instances의 설정(톱니바퀴) 선택
+
+   ![](images/beanstalk_5.png)
+
 5. EC2 key pair 지정
 
+
+* beanstalk 생성 시에도 동일하게 설정 창에서 key pair 지정 가능
 
 
 ### CUI 환경
 
-* awscli 사용
+* awsebcli 설치
+
+  ```shell
+  $ pip install --upgrade --user awsebcli
+  ```
+
+* 환경 변수 등록 (Mac)
+
+  ```shell
+  $ export PATH=/User/yongho/Library/Python/<버전>/bin:$PATH
+  ```
+
+* 설치 확인
+
+  ```shell
+  $ eb --version
+  ```
+
+  ​
 
 
 
