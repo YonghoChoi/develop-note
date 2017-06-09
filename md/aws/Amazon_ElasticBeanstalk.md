@@ -4,7 +4,17 @@
 
 * Beanstalk의 어플리케이션 생성 과정에서는 EC2 인스턴스가 구동될 때 적용할 스크립트라던지 종료 스크립트와 같은 설정이 없음.
 * ebextensions를 통해 확장 설정을 하던지, AMI를 사용해야 함.
+* EC2 인스턴스를 직접 조작하여 종료나 시작하면 안되고 beanstalk의 App restart 기능을 이용해야 한다.
+  * EC2 인스턴스를 직접 Stop 해버리면 다시 구동 시 해당 인스턴스는 제거되고 새로 생성됨
 
+
+
+
+## Hook
+
+* Amazon Beanstalk에서 내리는 명령에 따라 hook을 사용하여 해당 시점에 스크립트를 수행할 수 있다.
+  * 각 EC2 인스턴스 기준이 아니고 Beanstalk를 통해 앱 서버를 배포하거나 업데이트하거나 재시작 시에 수행되는 스크립트 설정
+* ​
 
 
 ### .ebextensions
@@ -149,10 +159,15 @@
 ### AMI 사용
 
 * 미리 원하는 환경을 구성 한 후 AMI를 만든 후 beanstalk 생성 시 AMI를 사용
-  * 로그 수집을 위해 filebeat를 설치하고 셋팅한 ubuntu 이미지를 AMI로 생성
+  * 로그 수집을 위해 filebeat를 설치하고 셋팅한 이미지를 AMI로 생성
 * Beanstalk에서 tomcat을 선택했을 때 사용되는 AMI
   - ami-e404d98a
   - 이 AMI를 기반으로 필요한 패키지 설치 및 설정
+* 기본적으로 Amazon Linux 기반으로 가능
+  * ubuntu도 사용 가능하지만 추가적인 설정이 필요
+    * Packer를 통한 이미지 빌드 수행 과정이 필요
+
+
 
 
 
