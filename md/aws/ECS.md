@@ -1,35 +1,39 @@
-# ECS
+# ECS (EC2 Container Service)
+
+ECS는 Docker를 사용하여 EC2 인스턴스 **클러스터**에 애플리케이션을 쉽게 배포하고 확장, 축소가 가능하도록 해주는 서비스이다.  이를 위해 각 EC2 인스턴스에 Docker 컨테이너를 어떻게 구성하여 띄울 것인지에 대한 **작업 정의**를 해 놓고, 이 작업정의를 기반으로 클러스터에 어떻게 실행하고 유지 관리할지에 대한 정의가 포함되어 있는 **서비스**를 생성한다. 이 서비스에 대한 정의에 따라 ELB와 Auto Scaling이 구성되어 클러스터 내 EC2 인스턴스들이 확장되거나 축소될 수 있다.
+
+
 
 ## 주요 구성 요소
 
-* Container Instance
+* **Container Instance**
 
   * Amazon ECS 에이전트를 실행 중이며 클러스터에 등록된 Amazon EC2 인스턴스
   * 각 인스턴스가 EC2 서버 한대라고 생각하면 됨
 
-* Container
+* **Container**
 
-  * 태스크의 일부로 작성된 Linux 컨테이너
+  * Task의 일부로 작성된 Linux 컨테이너
 
-* Cluster
+* **Cluster**
 
   * Container Instance의 논리적인 그룹
 
     ![](images/ecs_1.png)
 
-* Task Definitions
+* **Task Definitions**
 
   * 작업 정의 : 컨테이너에 대한 정의
 
     ![](images/ecs_2.png)
 
-* Tasks
+* **Tasks**
 
   * 정의 해놓은 작업을 Container Instance로 배포 (작업 정의의 단일 인스턴스)
 
     ![](images/ecs_3.png)
 
-* Service
+* **Service**
 
   * 배포된 각 작업들이 Container Instance에서 구동된 것을 서비스라고 함.
 
@@ -38,10 +42,13 @@
 
 
 
+
+
+
+
 ## Amazon ECS 작업 스케쥴링
 
 * ECS는 long running 하는 stateless한 서비스 및 애플리케이션을 위한 서비스 스케쥴러를 제공
-  * 상태 저장이 없어야 오토스케일링이 가능하기 때문에 stateless 해야함
 * 서비스 스케쥴러는 지정된 수의 작업이 지속적으로 실행되도록 하고, 작업이 실패할 경우에는 해당 작업을 다시 스케쥴한다.
   * 원하는 작업 개수 지정 시에는 ALB를 사용하는 경우 고정된 포트로 원하는 작업의 개수만큼 컨테이너 인스턴스가 필요하므로 원하는 작업 수 이상의 컨테이너 인스턴스를 지정해야함
 * 서비스 스케쥴러는 선택적으로 ELB에 작업을 등록시킬 수 있음
@@ -49,7 +56,35 @@
 
 
 
-## 작업 정의
+
+## 서비스 (Service)
+
+- Amazon ECS는 단일 ECS 클러스터에서 작업 정의에 지정된 수("원하는 개수")의 인스턴스를 동시에 실행 및 관리할 수 있게 해줌
+
+- 서비스에서 작업이 중지되는 경우 해당 작업은 종료되었다가 다시 시작됨.
+
+  - 이 프로세스는 원하는 실행 작업 수에 도달할 때까지 계속 됨
+  - 해당 컨테이너 인스턴스의 docker 컨테이너가 제거되었다가 다시 생성됨.
+
+- 필요한 경우 ELB를 사용하여 서비스의 작업에 트래픽을 균등하게 분산하도록 구성할 수 있음
+
+  - [서비스 로드 밸런싱](http://docs.aws.amazon.com/ko_kr/AmazonECS/latest/developerguide/service-load-balancing.html) 참조
+
+- 서비스 스케쥴러가 최소 상태 백분율 및 최대 백분율 파라미터를 사용하여 배포 전략 결정
+
+  - [서비스 정의 파라미터](http://docs.aws.amazon.com/ko_kr/AmazonECS/latest/developerguide/service_definition_paramters.html) 참조
+
+- 서비스 스케쥴러 동작 방식 (다음의 로직으로 가용 영역 간의 작업을 밸런싱)
+
+  - 클러스터에서 어느 컨테이너 인스턴스가 서비스의 작업 정의를 지원할 수 있는지 판단
+    - 필요한 CPU, 메모리, 포트 및 컨테이너 인스턴스 속성과 같은 것들로
+  - 인스턴스와 동일한 가용영역에서 이 서비스의 최소 실행 작업 수를 기준으로 유효한 컨테이너 인스턴스를 정렬.
+    - 여기서 최소 실행 작업수라는 것은 각 컨테이너 인스턴스가 구동 중인 작업수가 제일 작은 컨테이너 인스턴스가 우선순위가 높다는 것을 의미
+  - 위에서 결정된 컨테이너 인스턴스로 작업을 배치
+
+  ​
+
+## 작업 정의 (Task Definistions)의 컨테이너 설정
 
 ### 고급 컨테이너 구성
 
@@ -146,29 +181,11 @@
 
 
 
-## 서비스
-
-* Amazon ECS는 단일 ECS 클러스터에서 작업 정의에 지정된 수("원하는 개수")의 인스턴스를 동시에 실행 및 관리할 수 있게 해줌
-* 서비스에서 작업이 중지되는 경우 해당 작업은 종료되었다가 다시 시작됨.
-  * 이 프로세스는 원하는 실행 작업 수에 도달할 때까지 계속 됨
-  * 해당 컨테이너 인스턴스의 docker 컨테이너가 제거되었다가 다시 생성됨.
-* 필요한 경우 ELB를 사용하여 서비스의 작업에 트래픽을 균등하게 분산하도록 구성할 수 있음
-  * [서비스 로드 밸런싱](http://docs.aws.amazon.com/ko_kr/AmazonECS/latest/developerguide/service-load-balancing.html) 참조
-* 서비스 스케쥴러가 최소 상태 백분율 및 최대 백분율 파라미터를 사용하여 배포 전략 결정
-  * [서비스 정의 파라미터](http://docs.aws.amazon.com/ko_kr/AmazonECS/latest/developerguide/service_definition_paramters.html) 참조
-* 서비스 스케쥴러 동작 방식 (다음의 로직으로 가용 영역 간의 작업을 밸런싱)
-  * 클러스터에서 어느 컨테이너 인스턴스가 서비스의 작업 정의를 지원할 수 있는지 판단
-    * 필요한 CPU, 메모리, 포트 및 컨테이너 인스턴스 속성과 같은 것들로
-  * 인스턴스와 동일한 가용영역에서 이 서비스의 최소 실행 작업 수를 기준으로 유효한 컨테이너 인스턴스를 정렬.
-    * 여기서 최소 실행 작업수라는 것은 각 컨테이너 인스턴스가 구동 중인 작업수가 제일 작은 컨테이너 인스턴스가 우선순위가 높다는 것을 의미
-  * 위에서 결정된 컨테이너 인스턴스로 작업을 배치
-* ​
 
 
 
 
-
-## ECU
+## ECU(Elastic Compute Units)
 
 * AWS에서는 EC2 머신의 성능을 표현하기 위해 ECU(Elastic Compute Units)라는 단위로 표현
 
@@ -202,7 +219,7 @@
 
 
 
-## AMI
+## AMI(Amazon Machine Image)
 
 * Amazon ECS-Optimized Amazon Linux AMI
   * 아마존에서 docker를 사용하기에 최적화 된 환경을 Amazon Linux에 구축한 AMI
@@ -210,7 +227,8 @@
 
 
 
-## ELB
+
+## ELB(Elastic Load Balancer)
 
 ### ALB (Application Load Balancer)
 
@@ -248,7 +266,7 @@
 
 
 
-#### ALB를 사용할 떄의 이점 (CLB 사용 시 보다)
+#### ALB를 사용할 때의 이점 (CLB 사용 시 보다)
 
 * 경로(URL) 기반 라우팅 지원
 * 단일 EC2 인스턴스에 여러 포트를 사용하여 여러 서비스로 요청 라우팅을 지원
@@ -258,6 +276,8 @@
 * 상태 검사가 대상 그룹 단위로 정의되기 때문에 CloudWatch에서 메트릭을 대상 그룹 단위로 모니터링 할 수 있음
 * 액세스 로그는 추가 정보를 포함하여 압축 된 형식으로 저장됨
 * 로드 밸런서 성능이 향상됨
+
+
 
 
 
@@ -283,7 +303,9 @@
 
 
 
-## ECR
+
+
+## ECR(EC2 Container Registry)
 
 * Docker Container Registry
 
