@@ -72,86 +72,16 @@
 
 - RHEL 기반에서의 서비스 동작
 
-  - 서비스 상태 : chkconfig —list
-  - 서비스 시작 : service <서비스명> start
-  - 부트 시 자동 시작 등록 : chkconfig <서비스명> on
+  - 서비스 상태 : `chkconfig --list`
+  - 서비스 시작 : `service <서비스명> start`
+  - 부트 시 자동 시작 등록 : `chkconfig <서비스명> on`
 
-- 서비스를 사용하여 종료 시 script를 수행하려면 다음과 같은 절차를 수행한다.
-
-  1. `/etc/rc.d/init.d`에 서비스로 등록할 스크립트 작성
-
-     * 이 스크립트에 start, stop, restart 시의 동작을 정의한다.
-
-       ```shell
-       #!/bin/bash
-       # chkconfig: 2345 90 90
-       # description: shutdown file for filebeat
-
-       start() {
-         echo "start2!!!"
-         touch /var/lock/subsys/shutdown-filebeat
-         echo "test" > /home/ec2-user/start_"$(date +%y%m%d_%H%M%S)".log
-       }
-
-       stop() {
-         echo "stop2!!!"
-         rm -f /var/lock/subsys/shutdown-filebeat
-         echo "test" > /home/ec2-user/stop_"$(date +%y%m%d_%H%M%S)".log
-       }
-
-       restart() {
-         echo "restart!!"
-         echo "test" > /home/ec2-user/restart_"$(date +%y%m%d_%H%M%S)".log
-       }
-
-       case "$1" in
-           start)
-               start
-           ;;
-           stop)
-               stop
-           ;;
-           restart)
-               restart
-           ;;
-           *)
-               echo $"Usage: $0 {start|stop|restart}"
-               exit 1
-       esac
-       ```
-
-       ​
-
-  2. `/etc/systemd/system` 하위에 스크립트 명과 동일한 이름의 `.service`파일 생성
-
-     * `/etc/rc.d/init.d`의 스크립트와 한 쌍
-     * `/etc/rc.d/init.d`의 스크립트, 즉 이 서비스를 관리하기 위한 설정파일이다.
-
-  3. `.service`파일에 종료 시 실행할 스크립트를 지정
-
-     * 왜인지는 모르겠지만 스크립트가 수행되지 않음.
-
-  4. `chkconfig <서비스 명> on` 명령을 통해 부트 시 자동 시작되도록 설정
-
-     * 부트 시 위에서 설정한 스크립트의 start가 호출됨
-
-  5. 여기서 시스템 종료를 하면 시작시 스크립트는 수행되는데 종료 시 스크립트는 수행되지 않는다.
-
-     * `/etc/rc3.d/` 하위에 종료시 stop 명령이 호출되도록 설정이 필요
-
-     * `K<종료우선순위><서비스명>`으로 심볼릭 링크를 만들어준다.
-
-     * 예를 들어 종료 우선순위가 90이고 서비스명이 shutdown-filebeat라면 `K90shutdown-filebeat`로 생성
-
-       ```shell
-       $ ln -s ../init.d/shutdown-filebeat K90shutdown-filebeat
-       ```
-
-     * 그리고 `/etc/rc.d/init.d`의 스크립트에서 start 구문에 `/var/lock/subsys/<서비스명>`으로 lock 파일을 생성해야 종료 시 스크립트를 수행할때까지 시스템이 종료되지 않고 락킹된다.
-
-  6. 이제 시스템을 종료하게 되면 `/etc/systemd/system/<서비스명>.service`에 지정된 스크립트가 수행됨
+- Linux AMI에서는 systemctl을 사용할 수 없어서 chkconfig를 사용
 
 
+
+
+## chkconfig
 
 ### chkconfig 등록
 
@@ -188,18 +118,18 @@
 
 ### chkconfig on
 
-* script를 추하기 위해 systems unit file 사용
+- script를 추하기 위해 systems unit file 사용
 
-* systemd의 주요 유닛으로는 service 유닛과 target 유닛이 있다.
+- systemd의 주요 유닛으로는 service 유닛과 target 유닛이 있다.
 
-  * service 유닛 : 리눅스 서버의 데몬을 관리하는데 사용
-    * 파일명이 `.service`로 끝난다.
-  * target 유닛 : 단순하게 다른 유닛을 일컫는 말
-    * 파일명이 `.target`으로 끝난다.
+  - service 유닛 : 리눅스 서버의 데몬을 관리하는데 사용
+    - 파일명이 `.service`로 끝난다.
+  - target 유닛 : 단순하게 다른 유닛을 일컫는 말
+    - 파일명이 `.target`으로 끝난다.
 
-* 리눅스 시스템의 유닛 설정 파일은 /lib/systemd/system 디렉토리와 /etc/systemd/system 디렉토리에 존재
+- 리눅스 시스템의 유닛 설정 파일은 /lib/systemd/system 디렉토리와 /etc/systemd/system 디렉토리에 존재
 
-* `/etc/systemd/system`의 하위에 `.service` 확장자를 가진 파일에 아래 내용 작성
+- `/etc/systemd/system`의 하위에 `.service` 확장자를 가진 파일에 아래 내용 작성
 
   ```shell
   [Unit]
@@ -215,12 +145,219 @@
   WantedBy=multi-user.target
   ```
 
-* chkconfig 명령을 통해 활성화
+- chkconfig 명령을 통해 활성화
 
   ```shell
   $ chkconfig <서비스명> on
   ```
 
+
+
+
+
+## 종료 script 수행 절차
+
+1. `/etc/rc.d/init.d`에 서비스로 등록할 스크립트 작성
+
+   * 파일 권한은 755로 지정. `chmod 755 <파일명>`
+
+
+   * 이 스크립트에 start, stop, restart 시의 동작을 정의한다.
+
+     ```shell
+     #!/bin/bash
+     # chkconfig: 2345 90 30
+     # description: shutdown file for filebeat
+
+     start() {
+       touch /var/lock/subsys/shutdown-filebeat
+       if [ ! -d "/var/log/shutdown-filebeat" ]; then
+         mkdir /var/log/shutdown-filebeat
+       fi
+     }
+
+     stop() {
+       python3 /home/ec2-user/script/shutdown-filebeat.py
+       rm -f /var/lock/subsys/shutdown-filebeat
+     }
+
+     restart() {
+       stop
+       start
+     }
+
+     case "$1" in
+         start)
+             start
+         ;;
+         stop)
+             stop
+         ;;
+         restart)
+             restart
+         ;;
+         *)
+             echo $"Usage: $0 {start|stop|restart}"
+             exit 1
+     esac
+     ```
+
+     * 서비스 시작 시 shutdown-filebeat에 대한 로그를 기록할 디렉토리가 없는 경우 생성
+     * 종료 시 python 스크립트를 수행
+     * python 스크립트는 아래 스크립트 내용 설명 참조
+
+2. 서비스에 해당 스크립트 등록
+
+   ```shell
+   $ chkconfig --add <파일명>
+   ```
+
+3. 서비스 등록 확인
+
+   ```shell
+   $ chkconfig --list
+   ```
+
+4. `/etc/systemd/system` 하위에 스크립트 명과 동일한 이름의 `.service`파일 생성
+
+   * `/etc/rc.d/init.d`의 스크립트와 한 쌍
+   * `/etc/rc.d/init.d`의 스크립트, 즉 이 서비스를 관리하기 위한 설정파일이다.
+
+5. `.service`파일에 종료 시 실행할 스크립트를 지정
+
+   ```shell
+   [Unit]
+   Description=Run Scripts at Shutdown
+
+   [Service]
+   Type=oneshot
+   RemainAfterExit=true
+   ExecStart=/bin/true
+   ExecStop=<스크립트 파일 경로>
+
+   [Install]
+   WantedBy=multi-user.target
+   ```
+
+   * 왜인지는 모르겠지만 스크립트가 수행되지 않음.
+
+6. `chkconfig <서비스 명> on` 명령을 통해 부트 시 자동 시작되도록 설정
+
+   * 부트 시 위에서 설정한 스크립트의 start가 호출됨
+
+7. 여기서 시스템 종료를 하면 시작시 스크립트는 수행되는데 종료 시 스크립트는 수행되지 않는다.
+
+   * `/etc/rc3.d/` 하위에 종료시 stop 명령이 호출되도록 설정이 필요
+
+   * 한가지 주의해야 할 점은 `shutdown -r now`를 통해 시스템을 종료하면  run level 6의 Reboot으로 수행된다. 그러므로 위에서 rc3.d에만 종료 링크를 걸어 주었기 때문에 제대로 스크립트가 실행되지 않는다.
+
+   * 또한 시스템 종료에 대한 부분은 runlevel 0이기 때문에 rc0.d에도 포함되어야 한다.
+
+     - /etc/rc0.d/와 /etc/rc6.d/ 하위에도 ln 명령을 통해 링크 파일을 만들어 주어 이를 해결
+
+   * `K<종료우선순위><서비스명>`으로 심볼릭 링크를 만들어준다.
+
+     * 톰캣의 종료 우선순위가 20이기 때문에 이보다는 나중에 종료 스크립트를 수행하도록 우선순위를 30으로 지정
+
+     * 서비스명이 shutdown-filebeat라면 `K30shutdown-filebeat`로 생성
+
+       ```shell
+       $ ln -s ../init.d/shutdown-filebeat K30shutdown-filebeat
+       ```
+
+   * 이 때, 중요한 점은 filebeat보다 종료 스크립트가 먼저 수행되어야 한다는 것이다. 그래야만 filebeat가 보내던 파일을 도중에 중단하지 않고 종료 스크립트를 통해 대기를 할 수 있다.
+
+     * filebeat의 종료 우선순위 조정. (종료 스크립트가 30이었으므로 filebeat의 종료 우선순위는 40으로 지정)
+
+     * /etc/rc.d/init.d/filebeat 파일에서 종료 우선순위 변경
+
+       ```shell
+       #!/bin/bash
+       #
+       # filebeat          filebeat shipper
+       #
+       # chkconfig: 2345 98 40
+       # description: Starts and stops a single filebeat instance on this system
+       #
+       ... 생략 ...
+       ```
+
+       * 주석의 chkconfig의 종료 우선순위를 40으로 설정
+
+     * /etc/rc3.d/와 /etc/rc6.d/ 하위에 filebeat 관련 링크 추가
+
+       ```shell
+       sudo ln -s ../init.d/filebeat K40filebeat
+       ```
+
+   * 그리고 `/etc/rc.d/init.d`의 스크립트에서 start 구문에 `/var/lock/subsys/<서비스명>`으로 lock 파일을 생성해야 종료 시 스크립트를 수행할때까지 시스템이 종료되지 않고 락킹된다.
+
+8. 이제 시스템을 종료하게 되면 `/etc/systemd/system/<서비스명>.service`에 지정된 스크립트가 수행됨
+
+
+
+## filebeat 상태 체크를 위한 python 스크립트
+
+```python
+import json
+import sys
+import time
+from datetime import datetime
+
+startDt = datetime.today()  # 스크립트 시작 시간
+updateDt = datetime.today()  # 파일 변경 발생 시 갱신될 시간
+files = {}
+
+
+def log(msg):
+    f = open("/var/log/shutdown-filebeat/debug.log", 'a+')
+    f.write("[" + datetime.now() + "] " + msg + "\n")
+    f.close()
+
+
+log("filebeat shutdown check start.")
+
+# 파일이 갱신된지 1분이 될 동안 변경사항이 없는 경우 성공
+while int((datetime.today() - updateDt).total_seconds()) < 10:
+    with open('/var/lib/filebeat/registry') as data_file:
+        data = json.load(data_file)
+
+    for d in data:
+        inode = d["FileStateOS"]["inode"]
+        offset = d["offset"]
+
+        if inode not in files:
+            files[inode] = offset
+            log("[add] inode : " + str(inode) + ", offset : " + str(files[inode]) + " -> " + str(offset))
+        else:
+            if files[inode] < offset:  # 존재 했었던 inode의 offset 값에 변동이 있었는지 검사
+                log("[update] inode : " + str(inode) + ", offset : " + str(files[inode]) + " -> " + str(offset))
+                files[inode] = offset
+                updateDt = datetime.today()  # 변동이 있었다면 update 시간 초기화
+
+    # 총 진행 시간이 30분이 넘어가는 경우 실패
+    if int((datetime.today() - startDt).total_seconds()) > 1800:
+        log("filebeat shutdown fail. time out.")
+        sys.exit(1)
+
+    time.sleep(5)  # 5초 주기로 파일 체크
+
+log("filebeat shutdown success.")
+sys.exit(0)
+
+```
+
+
+
+## EC2 인스턴스 Stop 시 종료 script를 다 끝마치지 않고 강제 종료되는 문제
+
+* EC2 인스턴스는 shutting-down 상태에서 몇분간 머무르게 되면 해당 인스턴스를 멈춰있는 인스턴스로 간주하여 강제 종료시킨다.
+  * [인스턴스 종료](http://docs.aws.amazon.com/ko_kr/AWSEC2/latest/UserGuide/terminating-instances.html) 참고
+  * [인스턴스 종료 문제 해결](http://docs.aws.amazon.com/ko_kr/AWSEC2/latest/UserGuide/TroubleshootingInstancesShuttingDown.html) 참고
+* Auto Scaling 설정이 되어 있으면 종료 시 기본으로 1시간 대기 시간이 주어진다.
+  * [인스턴스를 대기 상태로 유지](http://docs.aws.amazon.com/ko_kr/autoscaling/latest/userguide/lifecycle-hooks.html#lifecycle-hook-wait-state) 참고
+  * [축소 시 Auto Scaling에서 종료하는 인스턴스 제어](http://docs.aws.amazon.com/ko_kr/autoscaling/latest/userguide/as-instance-termination.html) 참고
+  * [Auto Scaling 수명 주기](http://docs.aws.amazon.com/ko_kr/autoscaling/latest/userguide/AutoScalingGroupLifecycle.html) 참고
 
 
 
