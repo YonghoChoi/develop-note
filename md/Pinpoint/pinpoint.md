@@ -114,7 +114,21 @@
      JAVA_OPTS="$JAVA_OPTS $JSSE_OPTS $PINPOINT_OPTS"
      ```
 
-     ​
+   * pinpoint.config 파일에 프로파일링을 원하는 클래스를 지정할 수 있다. 
+
+     ```
+     profiler.include=com.vinus.controller.*
+     ```
+
+     * 클래스를 지정하지 않으면 제대로 수집이 되지 않는 문제가 있었음.
+     * 원인은 조금 더 찾아봐야할 듯
+
+   * 샘플링 설정을 할 수 가 있는데 이 기능은 관리할 서버가 많은 경우 모든 패킷을 수집하게 되면 부하가 가기 때문에 전체 패킷의 퍼센티지로 패킷을 수집할 수 있다.
+
+     * 성능 분석을 위해서는 모든 패킷을 받을 필요는 없으므로 실제 라이브 서비스에서는 사용할 것을 권장.
+     * 샘플링 설정은 true 여야 모니터링이 가능.
+     * 기본값은 20인데 20번의 request당 하나의 패킷을 전달한다는 의미
+     * 1로 설정하면 무조건 수집
 
    ​
 
@@ -214,6 +228,21 @@ pinpoint-web:
 ```
 
 
+
+## 구성요소
+
+* WriteQueue
+  * CallStack Trace를 위해 각 메서드의 호출로 인해 스택에 스택프레임이 쌓이게 되면 이를 WriteQueue에 하나하나 저장한 후 collector에게 전송.
+* 추적에 사용되는 값
+  * TxId(Transaction ID) : GUID로 전체 메시지 아이디
+  * SpanId : 부모 자식 관계 정렬을 위한 ID
+  * pSpanId : 부모 자식 관계 정렬을 위한 ID
+* 분산 Transaction Trace
+  * 톰캣A에 Http요청이 오면 pinpoint가 이를 가로채서 TraceID를 injection
+    * injection 위치는 http 헤더
+  * 톰캣B로 전달을하면 해당 톰캣에서 request를 받아 transactionID를 찾음
+    * 이렇게 전달받은 톰캣은 자식 노드가 됨
+  * 톰캣 B의 처리가 끝나면 TraceData는 collector에게 전달
 
 
 
