@@ -159,3 +159,12 @@
 * 압축 도중에 프로세스는 설정된 최대 버전을 넘는 것은 정리하고 삭제되었거나 만료된 셀은 제거한다.
 * 리전서버에서 실행 중인 별도의 프로세스에서 플러시 파일 크기를 감시하고 이 크기가 설정된 최댓값을 넘어서면 리전을 나눈다.
 
+
+
+
+## 참고
+
+* https://charsyam.wordpress.com/category/cloud/hbase/
+* http://hbase.apache.org/book.html#quickstart_fully_distributed
+* http://hbase.apache.org/book.html#configuration
+
