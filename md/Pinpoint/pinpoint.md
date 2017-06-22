@@ -47,6 +47,12 @@
   * 외부 접근이 가능하도록 하려면 hbase.zookeeper.quorum 속성을 hbase-site.xml에 설정해야 한다.
     * 이 설정은 기본 값이 localhost이므로 외부에서 접근이 불가능
 
+* hadoop이 없는 상태의 hbase는 독립 실행 모드로만 동작 가능.
+
+  * 분산 처리 불가능
+  * HDFS가 없으므로 로컬 시스템에 테이블 저장
+  * ​
+
 ## Zookeeper
 
 * [Download](http://mirror.navercorp.com/apache/zookeeper/)
@@ -246,9 +252,41 @@ pinpoint-web:
 
 
 
+
+## TODO
+
+* hbase의 각 노드들과 zookeeper는 전부 같은 네트워크 안에서 서로 통신할 수 있어야 한다.
+* docker를 사용한다면 swarm으로 구성 고려
+  * overlay 네트워크를 만들어서 모든 서비스가 이 네트워크 안에 속하게
+  * 서비스 리스트
+    * pinpoint-collector
+    * pinpoint-web
+    * hbase
+    * hadoop
+    * zookeeper
+* hbase가 증가하면 zookeeper가 regionserver에 대한 설정파일을 업데이트 해줄 수 있는지 검토
+  * 이게 가능하면 docker로 scale 가능
+* pinpoint는 zookeeper에 접근하여 hbase의 접속 정보를 얻음
+  * 이 때 zookeeper는 master만 알려주나?
+  * 아니면 어떤 기준에 의해서 등록된 hbase 중 하나를 선택?
+  * 만약 master만 준다면 master가 알아서 분산해주는 건가?
+* pinpoint에서 cluster 설정은 뭘 의미하는거지?
+* Test 순서
+  1. 한 컨테이너 안에서 각각 프로그램을 실행하여 ip로 구성
+  2. 1이 성공하면 211 서버에 그대로 구성해보기
+  3. 2가 성공하면 docker swarm 구성 후 같은 네트워크 안에서 구동
+
+
+
+
 ## 참고
 
 * [pinpoint 소개 및 설치](http://dev2.prompt.co.kr/33)
 * [HBase와 Zookeer 동작 원리](http://guruble.com/?p=136)
 * [HBase에서의 Zookeeper](http://hbase.apache.org/0.94/book/zookeeper.html)
+* [대규모 분산 시스템 추적 플랫폼, Pinpoint](http://d2.naver.com/helloworld/1194202)
+* [pinpoint QnA](https://yangbongsoo.gitbooks.io/study/content/q&a.html)
+* [Deview 2015 pinpoint 관련 내용](http://serviceapi.rmcnmv.naver.com/flash/outKeyPlayer.nhn?vid=8B3E4703564F97B2324684DAAA3C8470A23D&outKey=V126be8b6348f5c4d31ba343b1734c0a7d68ad2e391384e567e39343b1734c0a7d68a&controlBarMovable=true&jsCallable=true&skinName=tvcast_white)
+* [허광남님의 pinpoint 설치 영상](https://www.youtube.com/watch?v=hrvKaEaDEGs)
+* [HBase 완전 분산 설치](http://blog.iotinfra.net/?tag=hbase-%EC%99%84%EC%A0%84%EB%B6%84%EC%82%B0-%EC%84%A4%EC%B9%98)
 
