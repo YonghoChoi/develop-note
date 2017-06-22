@@ -50,7 +50,6 @@ export HADOOP_HOME="/home/smilo/Working/BigData/hadoop-2.6.4"
         <value>/home/smilo/Working/BigData/hadoop-2.6.4/tmp</value>
     </property>
 </configuration>
-
 ```
 
 ### 6. etc/hadoop/hdfs-site.xml 수정
@@ -62,7 +61,6 @@ export HADOOP_HOME="/home/smilo/Working/BigData/hadoop-2.6.4"
         <value>1</value>
     </property>
 </configuration>
-
 ```
 
 ### 7. etc/hadoop/mapred-site.xml 수정 (YARN을 위한 설정)
@@ -74,7 +72,6 @@ export HADOOP_HOME="/home/smilo/Working/BigData/hadoop-2.6.4"
         <value>yarn</value>
     </property>
 </configuration>
-
 ```
 
 ### 8. etc/hadoop/yarn-site.xml 수정 (YARN을 위한 설정)
@@ -86,7 +83,6 @@ export HADOOP_HOME="/home/smilo/Working/BigData/hadoop-2.6.4"
         <value>mapreduce_shuffle</value>
     </property>
 </configuration>
-
 ```
 
 ### 9. passphraseless ssh 설정
@@ -95,21 +91,18 @@ export HADOOP_HOME="/home/smilo/Working/BigData/hadoop-2.6.4"
 $ ssh-keygen -t dsa -P '' -f ~/.ssh/id_dsa
 $ cat ~/.ssh/id_dsa.pub >> ~/.ssh/authorized_keys
 $ ssh localhost
-
 ```
 
 ### 10. filesystem 포멧
 
 ```
 $ bin/hdfs namenode -format
-
 ```
 
 ### 11. NameNode daemon, DataNode daemon 실행
 
 ```
 $ sbin/start-dfs.sh
-
 ```
 
 ### 12. ResourceManager daemon, NodeManager daemon 실행
@@ -167,3 +160,16 @@ $ rm -rf tmp
 $ bin/dhfs namenode -format
 $ sbin/start-dfs.sh
 ```
+* DataNode warning
+
+  ```Shell
+  $ hadoop namenode -format
+  $ sbin/stop-yarn.sh
+  $ sbin/stop-dfs.sh
+  $ sbin/start-dfs.sh
+  $ sbin/start-yarn.sh
+  $ hadoop dfsadmin -safemode leave
+  ```
+
+  * namenode를 포맷하고 재시작
+  * ​

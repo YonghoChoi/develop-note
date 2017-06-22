@@ -51,12 +51,7 @@
 
   * 분산 처리 불가능
   * HDFS가 없으므로 로컬 시스템에 테이블 저장
-  * ​
 
-## Zookeeper
-
-* [Download](http://mirror.navercorp.com/apache/zookeeper/)
-* ​
 
 
 
@@ -137,6 +132,319 @@
      * 1로 설정하면 무조건 수집
 
    ​
+
+
+## 완전 분산형 설치
+
+1. 하둡 설치 및 설정
+
+   1. 하둡 [다운로드](http://apache.tt.co.kr/hadoop/common/)
+
+   2. 압축 해제
+
+      ```shell
+      $ tar -xvf hadoop-x.x.x.tar.gz
+      $ cd hadoop-x.x.x
+      $ mkdir tmp
+      ```
+
+   3. etc/hadoop/hadoop-env.sh 수정
+      ```shell
+      # Set Hadoop-specific environment variables here.
+      export JAVA_HOME="/usr/lib/jvm/java-7-openjdk-amd64"
+      export HADOOP_HOME="/home/hive/programs/hadoop"
+      ```
+
+   4. etc/hadoop/core-site.xml 수정
+      ```xml
+      <configuration>
+          <property>
+              <name>fs.defaultFS</name>
+              <value>hdfs://localhost:9000</value>
+          </property>
+          <property>
+              <name>hadoop.tmp.dir</name>
+              <value>/home/smilo/Working/BigData/hadoop-2.6.4/tmp</value>
+          </property>
+      </configuration>
+      ```
+
+   5. etc/hadoop/hdfs-site.xml 수정
+      ```xml
+      <configuration>
+          <property>
+              <name>dfs.replication</name>
+              <value>1</value>
+          </property>
+      </configuration>
+      ```
+
+   6. etc/hadoop/mapred-site.xml 수정 (YARN을 위한 설정)
+      ```xml
+      <configuration>
+          <property>
+              <name>mapreduce.framework.name</name>
+              <value>yarn</value>
+          </property>
+      </configuration>
+      ```
+
+   7. etc/hadoop/yarn-site.xml 수정 (YARN을 위한 설정)
+
+      ```xml
+      <configuration>
+          <property>
+              <name>yarn.nodemanager.aux-services</name>
+              <value>mapreduce_shuffle</value>
+          </property>
+      </configuration>
+      ```
+
+   8. passphraseless ssh 설정
+      ```shell
+      $ ssh-keygen -t dsa -P '' -f ~/.ssh/id_dsa
+      $ cat ~/.ssh/id_dsa.pub >> ~/.ssh/authorized_keys
+      $ ssh localhost
+      ```
+
+   9. filesystem 포멧
+      ```shell
+      $ bin/hdfs namenode -format
+      ```
+
+   10. NameNode daemon, DataNode daemon 실행
+     ```shell
+     $ sbin/start-dfs.sh
+     ```
+
+   11. ResourceManager daemon, NodeManager daemon 실행
+      ```shell
+      $ sbin/start-yarn.sh
+      ```
+
+   12. 정상 동작 확인
+
+       ```shell
+       $ bin/hadoop fs -df -h
+       ```
+
+2. Zookeeper 설치 및 설정
+
+   1. Zookeeper [다운로드](http://mirror.navercorp.com/apache/zookeeper/)
+
+   2. 압축 해제
+
+      ```shell
+      $ tar xvfz zookeeper-x.x.x.tar.gz
+      $ mv conf/zoo-sample.cfg conf/zoo.cfg
+      ```
+
+   3. Zookeeper 설정
+
+      * conf/zoo.cfg
+
+        ```
+        dataDir=/data/zookeeper
+        ```
+
+3. HBase 설치 및 설정
+
+   1. Hbase [다운로드](http://apache.tt.co.kr/hbase/)
+
+   2. 압축해제
+
+      ```shell
+      $ tar xvfz hbase-x.x.x.tar.gz
+      ```
+
+   3. conf/hbase-env.sh 설정
+
+     ```shell
+     export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64/jre
+     export HBASE_PID_DIR=/opt/pids
+     export HBASE_MANAGES_ZK=false
+     ```
+
+     * JAVA_HOME과 Pid 저장 경로 설정
+     * zookeeper를 Hbase가 자체 관리하는 것 말고 외부에 설치한 것을 사용하기 위해 관리 설정을 false로 지정
+
+   4. conf/hbase-site.xml 설정
+
+     ```Xml
+     <configuration>
+             <property>
+                     <name>hbase.rootdir</name>
+                     <value>hdfs://25d2dfe7644e:9000/hbase</value>
+             </property>
+             <property>
+                     <name>hbase.master</name>
+                     <value>25d2dfe7644e:6000</value>
+             </property>
+             <property>
+                     <name>zookeeper.znode.parent</name>
+                     <value>/hbase</value>
+             </property>
+             <property>
+                     <name>hbase.zookeeper.property.dataDir</name>
+                     <value>/opt/data/zookeeper</value>
+             </property>
+             <property>
+                     <name>hbase.zookeeper.quorum</name>
+                     <value>25d2dfe7644e</value>
+             </property>
+             <property>
+                     <name>dfs.replication</name>
+                     <value>1</value>
+             </property>
+             <property>
+                     <name>hbase.zookeeper.property.clientPort</name>
+                     <value>2181</value>
+             </property>
+             <property>
+                     <name>hbase.cluster.distributed</name>
+                     <value>true</value>
+             </property>
+     </configuration>
+     ```
+
+     * 설치한 hadoop의 hdfs를 사용하기 위해 hbas.rootdir 경로 지정
+       * 해당 경로에 대한 설정은 hadoop의 etc/hadoop/core-site.xml 에서 설정
+     * hbase의 master 경로 설정
+     * zookeeper의 znode 설정
+     * zookeeper quorum 설정을 해야 해당 zookeeper 서버로 접속이 가능
+     * 분산 클러스터를 사용하는 경우 hbase.cluster.distributed 설정을 true로 해야한다.
+
+   5. HBase 실행
+
+      ```shell
+      $ HBASE_HOME/bin/start-hbase.sh
+      ```
+
+   6. 스키마 다운로드
+
+      ```Shell
+      $ wget https://raw.githubusercontent.com/naver/pinpoint/master/hbase/scripts/hbase-create.hbase
+      ```
+
+   7. 스키마 갱신
+
+      ```shell
+      $ HBASE_HOME/bin/hbase shell hbase-create.hbase
+      ```
+
+4. Pinpoint collector와 web의 war 파일 다운로드
+
+   * [최신 release 다운로드](https://github.com/naver/pinpoint/releases)
+   * 각각 톰캣을 구성하여 구동.
+   * 톰캣 설정에 대한 부분은 생략 (한 머신에서 구동하는 경우 포트를 겹치지 않게 해야 함)
+
+5. pinpoint collector 설정
+
+   * WEB-INF/classes/hbase.properties
+
+     ```shell
+     hbase.client.host=25d2dfe7644e
+     ```
+
+     * hbase의 호스트명 입력
+
+   * WEB-INF/classes/pinpoint-collector.properties
+
+     ```
+     기본 설정 그대로 사용
+     ```
+
+6. pinpoint web 설정
+
+   * WEB-INF/classes/hbase.properties
+
+     ```shell
+     hbase.client.host=25d2dfe7644e
+     ```
+
+     - hbase의 호스트명 입력
+
+   * WEB-INF/classes/pinpoint-web.properties
+
+     ```
+     기본 설정 그대로 사용
+     ```
+
+
+
+
+## 완전 분산형 실행
+
+1. 하둡 시작
+
+   ```shell
+   $ /opt/hadoop/sbin/start-dfs.sh
+   $ /opt/hadoop/sbin/start-yarn.sh
+   ```
+
+2. zookeeper 시작
+
+   ```shell
+   $ /opt/zookeeper/bin/zkServer.sh start
+   ```
+
+3. hbase 시작
+
+   ```shell
+   $ /opt/hbase/bin/start-hbase.sh
+   ```
+
+4. Pinpoint-collector 시작
+
+   ```shell
+   $ /opt/pinpoint-collector/bin/startup.sh
+   ```
+
+5. Pinpoint-web 시작
+
+   ```shell
+   $ /opt/pintpoint-web/bin/startup.sh
+   ```
+
+
+
+
+## 완전 분산형 초기화
+
+초기화 전에 collector와 web, hbase는 모두 종료되어 있어야 한다.
+
+1. hbase 초기화
+
+   * hadoop에서 hbase 저장소 확인
+
+     ```shell
+     $ hadoop fs -ls /
+     ```
+
+   * hbase 디렉토리 제거
+
+     ```shell
+     $ hadoop fs -rmr /hbase
+     ```
+
+     * 제거시 hbase가 종료되어 있어야 함.
+     * 살아있는 경우 캐시된 데이터를 다시 갱신하는 듯. 
+     * 삭제해도 다시 데이터가 복원됨
+
+2. zookeeper 초기화
+
+   ```shell
+   $ zkCli.sh -server localhost:2181
+   zookeeper> rmr /hbase
+   zookeeper> rmr /pinpoint-cluster
+   ```
+
+   ```shell
+   $ rm -rf /opt/data/zookeeper/*
+   ```
+
+   ​
+
 
 
 
