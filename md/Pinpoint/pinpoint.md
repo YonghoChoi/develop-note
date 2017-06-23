@@ -213,9 +213,9 @@
       ```
 
    10. NameNode daemon, DataNode daemon 실행
-     ```shell
-     $ sbin/start-dfs.sh
-     ```
+    ```shell
+    $ sbin/start-dfs.sh
+    ```
 
    11. ResourceManager daemon, NodeManager daemon 실행
       ```shell
@@ -445,6 +445,86 @@
 
    ​
 
+
+## docker로 만들기 위한 과정
+
+### hadoop
+
+* hadoop 실행 시 ssh 접속 문제로 인해 docker 컨테이너 구동 시 실행이 안됨
+
+  * namenode 확인
+
+    ```shell
+    $ bin/hdfs getconf -namenodes
+    ```
+
+  * localhost의 user들은 secure user로 등록하여 ssh 접속 하지 않도록 설정
+
+    ```shell
+    export HADOOP_SECURE_DN_USER=hive
+    ```
+
+  * 또는 로컬 유저의 인증 키 등록 (hadoop을 실행하는 유저 > 로컬의 유저)
+
+    ```shell
+    $ cat /root/.ssh/id_dsa.pub > /home/hive/.ssh/authorized_keys
+    ```
+
+  * ssh 접속을 물어보는 메시지 없이 자동으로 접속 가능하도록 설정해야함
+
+  * ssh key 파일 생성
+
+    ```shell
+    $ ssh-keygen -t dsa -P '' -f ~/.ssh/id_dsa
+    $ cat ~/.ssh/id_dsa.pub >> ~/.ssh/authorized_keys
+    ```
+
+  * verification message를 없애기 위해 /etc/ssh/ssh_config 설정 추가
+
+    ```
+    Host 192.168.0.*
+       StrictHostKeyChecking no
+    ```
+
+* core-site.xml 파일에서 hadoop에 접속할 주소 지정을 호스명으로
+
+  * etc/hadoop/hadoop-env.sh의 HADOOP_OPTS 전달 인자 추가
+
+    ```shell
+    -Dhostname=$HOSTNAME
+    ```
+
+  * etc/hadoop/core-site.xml에 전달 인자로 지정
+
+    ```xml
+    <property>
+      <name>fs.defaultFS</name>
+      <value>hdfs://${hostname}:9000</value>
+    </property>
+    ```
+
+    * 여기서 지정하게 되는 host 명으로 client도 접속을 해야한다.
+    * ip로 지정한 경우에는 해당 ip로 접근
+    * 호스트명을 넣은 경우 호스트명으로 접근
+      * 호스트명이 등록되어 있지 않은 경우 /etc/hosts에 추가
+
+## 이슈
+
+* 하둡 실행 시 WARN org.apache.hadoop.hdfs.server.datanode.DataNode: Problem connecting to server 
+
+  * 네임노드가 처음 시작할 때 혹은 Hadoop이 비정상 종료된 후 실행시키면 Safe mode에서 실행된다고 함.
+
+  * Safe mode에서 빠져나오게 한 후 실행해야 함
+
+    ```shell
+    $ bin/hadoop dfsadmin -safemode leave
+    ```
+
+  * namenode 초기화 수행namenode 초기화 수행
+
+    ```shell
+    $ bin/hdfs namenode -format
+    ```
 
 
 
