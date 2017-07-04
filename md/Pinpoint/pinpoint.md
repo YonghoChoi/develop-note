@@ -641,6 +641,26 @@ pinpoint-web:
 
 
 
+## Beanstalk 구성
+
+* beanstalk에서는 tomcat8 디렉토리에 pinpoint-agent를 두지않으면 javaagent 옵션을 통해 수행이 불가능. 
+
+  * 정확한 원인은 알아내지 못함.
+
+* .ebextensions 설정을 통해서 JVM Options에 javaagent 경로를 지정하면 구동시 무시됨.
+
+* 콘솔에서 Software Configuration을 통해 JVM Option 지정
+
+  ```
+  -javaagent:/usr/share/tomcat8/pinpoint-agent/pinpoint-bootstrap-1.6.2.jar
+  ```
+
+* environment 옵션은 ebextensions를 통해 전달 가능.
+
+
+
+
+
 ## TODO
 
 * hbase의 각 노드들과 zookeeper는 전부 같은 네트워크 안에서 서로 통신할 수 있어야 한다.

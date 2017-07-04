@@ -25,7 +25,7 @@
 3. docker service create 명령으로 visualizer 실행
 
    ```shell
-   $ docker service create \
+   $ docker service create -d \
     --name=viz \
     --publish=5000:8080/tcp \
     --constraint=node.role==manager \
@@ -86,7 +86,7 @@
 
 10. 생성한 서비스로 접속(아까와 같이 ELB 주소에 3000번 포트로)해보면 아래와 같은 페이지가 출력된다.
 
-    ![](images/cloudformation_4.png)
+   ![](images/cloudformation_4.png)
 
 11. 현재 이 웹페이지를 출력하기 위해 한대의 서버(컨테이너)를 사용하고 있는데 scale 명령으로 간단히 3대로 늘려본다.
 
