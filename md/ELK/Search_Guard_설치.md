@@ -115,6 +115,19 @@
 
    ![](images/searchguard_1.png)
 
+5. 브랜드 이미지를 변경하고 싶은 경우에는 config/kibana.yml에서 아래와 같이 설정
+
+   ```
+   searchguard.basicauth.login.showbrandimage: true
+   searchguard.basicauth.login.brandimage: "이미지 경로"
+   searchguard.basicauth.login.title: "로그인을 해주세요."
+   searchguard.basicauth.login.subtitle: "서브 타이틀입니다."
+   ```
+
+6. 키바나 재시작 후 접속
+
+   ![](images/searchguard_3.png)
+
    ​
 
 
