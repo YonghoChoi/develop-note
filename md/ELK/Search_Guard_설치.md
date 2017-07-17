@@ -251,8 +251,98 @@ network.host: 0.0.0.0
    ]
    ```
 
-   ​
 
+
+
+
+### 사용자 관리
+
+아래에서 사용되는 설정 파일들은 `<elasticsearch path>/plugins/search-guard-5/` 하위에 위치함.
+
+
+
+#### 사용자 추가
+
+1. sgconfig/sg_internal_users.yml 파일에 유저 추가
+
+   ```yaml
+   guest:
+     hash: 
+     #password is: guest
+   ```
+
+2. tools/hash.sh를 사용하여 패스워드 생성
+
+   ```shell
+   $ sh hash.sh
+   [Password:]
+   $2a$12$izzerIN4R.m6nCDNuCPtWOR/6n/LBudgjPLBS1naNptyF2VuUPwfe
+   ```
+
+3. 생성된 해쉬코드를 복사하여 sgconfig/sg_internal_users.yml 파일에 추가
+
+   ```yaml
+   guest:
+     hash: $2a$12$izzerIN4R.m6nCDNuCPtWOR/6n/LBudgjPLBS1naNptyF2VuUPwfe
+     #password is: guest
+   ```
+
+4. tools/sgadmin_demo.sh 파일을 실행하여 변경된 사항 적용
+
+   ```shell
+   $ ./sgadmin_demo.sh
+   ```
+
+
+
+#### 권한 설정
+
+1. 사용자에 대한 권한 role 이름을 sgconfig/sg_roles_mapping.xml 파일에 설정 하고, role 이름을 기반으로 사용자들을 해당 role에 추가시켜서 다수의 사용자들에게 동일한 role을 지정할 수 있다.
+
+   * 기본적으로 prefix로 sg_가 붙음
+
+
+   * 위에서 추가한 guest의 경우 sg_guest로 지정
+
+     ```yaml
+     sg_guest:
+       uesrs:
+         - guest
+     ```
+
+2. sgconfig/sg_roles.xml 파일 수정
+
+   * 위에서 설정한 role 이름에 대한 권한을 지정한다.
+
+   * 여기서는 guest로 들어온 경우 read only 권한을 부여
+
+     ```yaml
+     sg_guest:
+       cluster:
+         - UNLIMITED
+       indices:
+         '*':
+           '*':
+             - READ
+     ```
+
+   * 대문자로 표시되어 있는 값들은 sgconfig/sg_action_groups.yml 파일에 정의되어 있다.
+
+     * 위에 설정한 READ의 경우 아래와 같이 설정됨
+
+       ```yaml
+       READ:
+         - "indices:data/read*"
+         - "indices:admin/mappings/fields/get*"
+       ```
+
+3. 변경된 사항을 적용하기 위해 tools/sgadmin_demo.sh 실행
+
+   ```shell
+   $ ./sgadmin_demo.sh
+   ```
+
+   ​
 
 ## 트러블슈팅
 
@@ -271,7 +361,6 @@ java.lang.IllegalStateException: handshake failed with {#zen_unicast_127.0.0.1:9
         at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1142) [?:1.8.0_131]
         at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:617) [?:1.8.0_131]
         at java.lang.Thread.run(Thread.java:748) [?:1.8.0_131]
-
 ```
 
 * conf/elasticsearch.yml 설정에서 network.publish_host와 network.bind_host가 모두 설정되어 있는 경우 network.publish_host 설정을 제거하면 해결됨

@@ -4,6 +4,8 @@ ELK 관련 docker 이미지들은 기존에 Docker hub를 통해 내려받을 �
 
 ## elasticsearch
 
+### Dockerfile
+
 ```dockerfile
 FROM docker.elastic.co/elasticsearch/elasticsearch:5.5.0
 
@@ -13,9 +15,11 @@ ENV ES_CLUSTER_NAME hive_es
 USER root
 RUN yum install -y sudo
 RUN echo 'elasticsearch:qusduddnjs' | chpasswd
+#RUN adduser elasticsearch sudo
 RUN echo 'elasticsearch ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
 COPY conf/elasticsearch.yml ./config/
+#COPY conf/jvm.options ./config/
 COPY conf/sysctl.conf /etc/
 COPY start.sh /start.sh
 RUN tr -d '\r' < /start.sh > /temp.sh && mv /temp.sh /start.sh
@@ -38,7 +42,51 @@ RUN cd /usr/share/elasticsearch//plugins/search-guard-5/tools && \
 
 
 
+### start.sh
+
+```shell
+#/bin/bash
+cd /usr/share/elasticsearch/plugins/search-guard-5/tools && ./sgadmin_demo.sh
+```
+
+
+
 ## kibana
+
+### Dockerfile
+
+```dockerfile
+FROM docker.elastic.co/kibana/kibana:5.5.0
+
+# sudo 권한 부여
+USER root
+RUN yum install -y sudo wget
+RUN echo 'kibana:qusduddnjs' | chpasswd
+#RUN adduser elasticsearch sudo
+RUN echo 'kibana ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+# install logtrail
+RUN kibana-plugin install https://github.com/sivasamyk/logtrail/releases/download/v0.1.17/logtrail-5.5.0-0.1.17.zip
+COPY conf/logtrail.json /usr/share/kibana/plugins/logtrail/logtrail.json
+
+# install search guard
+RUN wget -O /opt/searchguard-kibana.zip https://github.com/floragunncom/search-guard-kibana-plugin/releases/download/v5.5.0-3/searchguard-kibana-5.5.0-3.zip
+RUN kibana-plugin install file:///opt/searchguard-kibana.zip
+
+COPY conf/kibana.yml /usr/share/kibana/config/kibana.yml
+```
+
+
+
+## logstash
+
+### Dockerfile
+
+```
+
+```
+
+
 
 
 
@@ -48,3 +96,4 @@ RUN cd /usr/share/elasticsearch//plugins/search-guard-5/tools && \
 
 - [Elasticsearch with Docker](https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html)
 - [Elasticsearch Dockerfile](https://github.com/elastic/elasticsearch-docker/blob/master/templates/Dockerfile.j2)
+- [Logstash Settings File](https://www.elastic.co/guide/en/logstash/5.5/logstash-settings-file.html)
