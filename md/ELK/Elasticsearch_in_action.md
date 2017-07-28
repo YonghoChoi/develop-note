@@ -176,4 +176,47 @@
         }
       ```
 
-      ​
+* document 업데이트 시 사용되는 script 에서 조건문은 사용 가능한가?
+
+  * script는 아래와 같이 사용할 수 있다.
+
+    ```
+    POST hive_user/6072638508432231093/AV2G-E8xG52pRIDg0dwN/_update
+    {
+      "script": {
+        "inline": "ctx._source.weaponInvenTable.partsLevel1 += params.value",
+        "lang": "painless",
+        "params": {
+          "value": 2
+        }  
+      }
+    }
+    ```
+
+  * 조건문도 inline 부분에 사용가능한데 문자열 내에 한줄로 입력을 해야한다.
+
+    ```
+    POST hive_user/5155483832070376030/AV2HFAEtG52pRIDg0d3n/_update
+    {
+      "script": {
+        "inline": "if(ctx._source.type.contains(params.type)){ ctx._source.weaponInvenTable.partsLevel1 = 1 }",
+        "lang": "painless",
+        "params": {
+          "type": "WEAPON_INSERT"
+        }  
+      }
+    }
+    ```
+
+    * update 시에는 index, type, id를 명시
+    * 업데이트에 대한 충돌을 방지하기 위해 version 필드를 사용한다. 
+      * 업데이트 되면 version 필드 값이 1씩 증가
+
+* query 명령으로 index가 제거되는 것을 방지하려면?
+
+  * elasticsearch.yml에 destructive_requires_name 옵션을 true로 변경하면 삭제 시 _all 뿐만 아니라 색인 이름으로 된 와일드 카드 명령까지 거부
+
+* document 삭제
+
+  * document는 삭제 요청 후 바로 삭제되지는 않고 삭제 표시만 해둔 상태에서 루씬 세그먼트가 비동기적으로 병합될 때 발생한다.
+  * 전체 색인 삭제의 경우에는 병합 없이 디스크에서 파일을 삭제할 수 있기 때문에 하나 이상의 개별 도큐먼트 삭제보다 빠르다.
