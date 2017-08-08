@@ -344,6 +344,109 @@ network.host: 0.0.0.0
 
    ​
 
+### Trasnport Client 설정
+
+1. keystore의 Owner 정보가 필요하므로 아래 명령을 통해 kirk.jks 파일의 Owrner 정보 획득
+
+   ```shell
+   $ keytool -list -v -keystore kirk.jks
+   ```
+
+   * 여기서 사용되는 keystore 파일은 Search Guard의 샘플 스크립트를 통해 생성시 자동으로 생성되는 keystore 파일이다. 
+   * 위 keystore 파일은 널리 알려진 파일이므로 실제 Product 환경에서는 별도로 keystore를 생성해야 한다.
+
+2. Elasticsearch 디렉토리에서 SearchGuard Plugin 설정
+
+   * sg_internal_users.yml 파일에 user 추가
+
+     ```
+     CN=kirk,OU=client,O=client,L=Test,C=DE:
+       hash: $2a$12$JKTh.SbXnKp.CcxOjIcmNumKEZZM1rILb18g/Y2lFeBtTxlUKAPgu
+     ```
+
+     * keystore 파일로 인증하기 때문에 비밀번호는 필요 없지만 보안을 위해 설정해둔다.
+
+   * sg_roles_mapping.yml 파일에 권한 추가
+
+     ```
+     sg_readall:
+       users:
+         - user1
+         - user2
+         - 'CN=kirk,OU=client,O=client,L=Test,C=DE'
+     ```
+
+   * sg_config.yml authc 부분에 아래 설정 추가
+
+     ```yaml
+     transport_auth_domain:
+       enabled: true
+       order: 2
+       http_authenticator:
+       authentication_backend:
+         type: internal
+     ```
+
+   * elasticsearch.yml 파일에 transport 관련 설정 확인
+
+     ```yaml
+     searchguard.ssl.transport.keystore_filepath: keystore.jks
+     searchguard.ssl.transport.truststore_filepath: truststore.jks
+     searchguard.ssl.transport.enforce_hostname_verification: false
+     searchguard.ssl.http.enabled: true
+     searchguard.ssl.http.keystore_filepath: keystore.jks
+     searchguard.ssl.http.truststore_filepath: truststore.jks
+     searchguard.authcz.admin_dn:
+       - CN=kirk,OU=client,O=client,L=test, C=de
+     ```
+
+3. 이제 코드에서 사용하기 위한 설정을 수행하도록 한다.
+
+4. gradle 설정 추가
+
+   ```groovy
+   compile 'com.floragunn:search-guard-ssl:5.5.1-23'
+   ```
+
+5. TransportClient 생성 시 Settings 객체를 통해 설정
+
+   ```java
+   final Settings settings = Settings.builder()
+           .put("cluster.name", "es_test")
+           .put(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_ENABLED, true)
+           .put(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_FILEPATH, getAbsoluteFilePathFromClassPath("kirk.jks"))
+           .put(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_FILEPATH, getAbsoluteFilePathFromClassPath("truststore.jks"))
+           .put(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_PASSWORD, "changeit")
+           .put(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_PASSWORD, "changeit")
+           .put(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_ALIAS, "kirk")
+           .put(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_ENFORCE_HOSTNAME_VERIFICATION, false)
+           .build();
+
+   TransportClient tc = new PreBuiltTransportClient(settings, SearchGuardSSLPlugin.class).addTransportAddress(new InetSocketTransportAddress(InetAddress.getByName("localhost"), 9300));
+   ```
+
+6. 쿼리 테스트
+
+   ```java
+   SearchResponse response = tc.prepareSearch("index1", "index2")
+           .setTypes("type1", "type2")
+           .setSearchType(SearchType.DFS_QUERY_THEN_FETCH)
+           .setQuery(QueryBuilders.termQuery("multi", "test"))                 // Query
+           .setPostFilter(QueryBuilders.rangeQuery("age").from(12).to(18))     // Filter
+           .setFrom(0).setSize(60).setExplain(true)
+           .get();
+
+   for(SearchHit hit : response.getHits().getHits()) {
+       System.out.println(hit.getSource());
+   }
+
+   tc.close();
+   ```
+
+   ​
+
+
+
 ## 트러블슈팅
 
 ### zen_unicast 관련 에러
@@ -496,3 +599,5 @@ java.lang.IllegalStateException: handshake failed with {#zen_unicast_127.0.0.1:9
 * [Secure Guard 설정 참고](https://github.com/floragunncom/search-guard/issues/136)
 * [SSL 이론 설명](http://btsweet.blogspot.kr/2014/06/tls-ssl.html)
 * [Search Guard logstash 설정](https://github.com/floragunncom/search-guard-docs/blob/master/logstash.md)
+* [Search Guard Transport Client 설정](https://floragunn.com/searchguard-elasicsearch-transport-clients/)
+* [Search Guard Transport Client 테스트 코드](https://github.com/floragunncom/search-guard/blob/master/src/test/java/com/floragunn/searchguard/SGTests.java)
