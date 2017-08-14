@@ -424,6 +424,37 @@ network.host: 0.0.0.0
 
    TransportClient tc = new PreBuiltTransportClient(settings, SearchGuardSSLPlugin.class).addTransportAddress(new InetSocketTransportAddress(InetAddress.getByName("localhost"), 9300));
    ```
+   * 키 파일은 절대경로로 지정한다. 
+
+   * 절대경로로 참조하기 위해 아래 유틸성 메서드를 사용.
+
+   * 해당 프로젝트의 resources(src/main/resources) 디렉토리에 파일을 위치시키면 된다.
+
+     ```java
+     public static File getAbsoluteFilePathFromClassPath(final String fileNameFromClasspath) {
+             File file = null;
+             final URL fileUrl = Main.class.getClassLoader().getResource(fileNameFromClasspath);
+             if (fileUrl != null) {
+                 try {
+                     file = new File(URLDecoder.decode(fileUrl.getFile(), "UTF-8"));
+                 } catch (final UnsupportedEncodingException e) {
+                     return null;
+                 }
+
+                 if (file.exists() && file.canRead()) {
+                     return file;
+                 } else {
+                     System.out.println(String.format("Cannot read from {}, maybe the file does not exists? ", file.getAbsolutePath()));
+                 }
+
+             } else {
+                 System.out.println("Failed to load " + fileNameFromClasspath);
+             }
+             return null;
+         }
+     ```
+
+     ​
 
 6. 쿼리 테스트
 
@@ -431,8 +462,8 @@ network.host: 0.0.0.0
    SearchResponse response = tc.prepareSearch("index1", "index2")
            .setTypes("type1", "type2")
            .setSearchType(SearchType.DFS_QUERY_THEN_FETCH)
-           .setQuery(QueryBuilders.termQuery("multi", "test"))                 // Query
-           .setPostFilter(QueryBuilders.rangeQuery("age").from(12).to(18))     // Filter
+           //.setQuery(QueryBuilders.termQuery("multi", "test"))                 // Query
+           //.setPostFilter(QueryBuilders.rangeQuery("age").from(12).to(18))     // Filter
            .setFrom(0).setSize(60).setExplain(true)
            .get();
 
