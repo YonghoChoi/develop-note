@@ -111,3 +111,36 @@ $ openssl rsautl -decrypt -inkey private.pem -in encrypttext.ssl -out decrypttex
   * intermediate.pem : 중계자 인증서
 
 * ​
+
+
+
+## Tips
+
+* openssl 명령으로 SSL 인증서 정보 확인
+
+  ```shell
+   $ openssl s_client -connect 192.168.10.217:443 -showcerts
+  ```
+
+* curl로 연결해서 정보 확인
+
+  ```shell
+  $ curl -v -k -I https://mysite.example.com
+  ```
+
+* nginx의 https 적용을 위해 키 생성
+
+  ```shell
+  $ openssl genrsa -des3 -out private.key 2048
+  $ openssl req -new -key private.key -out out.csr -subj "/C=KR/ST=Seoul/L=Gang-nam/O=Vinus Entertainment/OU=Server Team/CN=vinusent.net"
+  $ openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout nginx.key -out nginx.crt
+  ```
+
+
+
+
+
+## 참고
+
+* [Java에서 SSL 인증서 검증 하지 않도록 설정](https://stackoverflow.com/questions/875467/java-client-certificates-over-https-ssl)
+
