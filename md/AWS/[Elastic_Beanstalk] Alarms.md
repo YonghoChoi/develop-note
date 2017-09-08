@@ -99,16 +99,12 @@ INSUFFICIENT_DATA 알람은 트리거를 발동하기 위한 데이터가 부족
 
 
 
-
-
-
-
 ## 참고
 
 * [Amazon CloudWatch 경보 만들기](http://docs.aws.amazon.com/ko_kr/AmazonCloudWatch/latest/monitoring/AlarmThatSendsEmail.html)
 * [인스턴스에 대한 세부 모니터링 활성화 또는 비활성화](http://docs.aws.amazon.com/ko_kr/AWSEC2/latest/UserGuide/using-cloudwatch-new.html)
 * [Amazon EC2 모니터링](https://aws.amazon.com/ko/cloudwatch/details/#amazon-ec2-monitoring)
-* ​
+* [CloudWatch 성능 모니터링과 신속한 대응을 위한 노하우](https://www.slideshare.net/awskorea/cloudwatch-aws-cloud-track-3-gaming)
 
 
 
