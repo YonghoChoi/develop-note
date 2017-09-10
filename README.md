@@ -1,20 +1,6 @@
-# develope-note
+# 개발 노트
 
-## Note
+* 개인적으로 공부하거나 현업에서 경험하며 배운 내용들을 자유롭게 정리한 Repository 입니다. 
+* **md** 디렉토리에는 각 분야별로 경험한 내용들이 담겨 있으며 Markdown 언어로 작성되어 있습니다.
+* **ppt** 디렉토리에는 경험한 내용을 기반으로 발표를 하기 위해 준비한 자료들이 담겨 있으며 Powerpoint로 작성되어 있습니다.
 
-* [Docker](md/Docker.md)
-* [Thrift](md/Thrift.md)
-* [패킷 보간처리](md/패킷동기화.md)
-* [Java Logging](md/logging.md)
-* [Linux Command](md/linux-command.md)
-* [Ajax](md/Ajax/Ajax.md)
-
-## 책 정리
-
-* [자바 네트워크 소녀 네티](md/Netty/README.md)
-* [리팩토링](md/Refactoring/README.md)
-* [패턴을 활용한 리팩토링](md/Refactoring-to-patterns/README.md)
-* [Java8 in Action](md/Java8-in-Action/README.md)
-* [D3.js](md/D3.js/README.md)
-* [Spring4.0 프로그래밍](md/Spring4.0-Programming/README.md)
-* [이것이 자바다](md/이것이자바다/README.md)
