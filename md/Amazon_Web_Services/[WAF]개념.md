@@ -89,6 +89,20 @@
 
 
 
+## 이용 형태
+
+1. 셀프 서비스
+   * 직접 WAF의 규칙을 설정하고 공격에 대응
+   * 추가비용 없음
+2. 디도스 전문가(Amazon의 DRT팀)에게 요청
+   * DRT팀에서 모니터링 하고 있음. 
+   * 디도스 공격이 어디서 왔는지 분석하고 고객에게 전달함
+   * 가이드를 받아서 개발사에서 처리
+3. 선제적으로 DRT팀 개입
+   * WAF의 IAM 퍼미션을 DRT팀에 부여를 하고 알아서 대응하게끔 처리
+
+
+
 ## 용어
 
 * 오리진 서버 : 웹 서버를 의미
@@ -100,4 +114,6 @@
 ## 참고
 
 * [WAF 시작하기](http://docs.aws.amazon.com/ko_kr/waf/latest/developerguide/getting-started.html)
-
+* [AWS WAF를 활용하여 IP주소 기반의 차단 정책 사용하기](http://cloud.hosting.kr/aws-waf%EB%A5%BC-%ED%99%9C%EC%9A%A9%ED%95%98%EC%97%AC-ip%EC%A3%BC%EC%86%8C-%EA%B8%B0%EB%B0%98%EC%9D%98-%EC%B0%A8%EB%8B%A8-%EC%A0%95%EC%B1%85-%EC%82%AC%EC%9A%A9%ED%95%98%EA%B8%B0/)
+* [AWS WAF를 활용하여 SQL injection 공격 방어하기!!](http://cloud.hosting.kr/aws-waf%EB%A5%BC-%ED%99%9C%EC%9A%A9%ED%95%98%EC%97%AC-sql-ingection-%EA%B3%B5%EA%B2%A9-%EB%B0%A9%EC%96%B4%ED%95%98%EA%B8%B0/)
+* [AWS Lambda와 WAF를 이용한 Rate-Based Blacklisting 기능 구현](https://aws.amazon.com/ko/blogs/korea/how-to-configure-rate-based-blacklisting-with-aws-waf-and-aws-lambda/)
