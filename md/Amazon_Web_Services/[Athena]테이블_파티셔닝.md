@@ -20,7 +20,7 @@ s3://hive-live-log/DEBUG/year=2018/month=03/day=03/
 s3://hive-live-log/DEBUG/dt=2018-03-03/
 ```
 
-이렇게 버킷을 생성하고 아테나에서 테이블 생성 시 파티션 컬럼을 설정하는 부분에서 아래와 같이 파티션 명에 맞춰서 컬럼을 생성한다.
+여기서 사용한 year, month, day, dt는 아테나에서 쿼리 시에 버킷 범위를 지정하기 위해 사용할 파티션 컬럼이다. 쿼리가 가능하도록 원하는 컬럼명과 형식으로 지정하면 되기 때문에 year, month, day로 컬럼명을 맞출 필요는 없다. 이렇게 버킷을 생성하고 아테나에서 테이블 생성 시 파티션 컬럼을 설정하는 부분에서 아래와 같이 파티션 명에 맞춰서 컬럼을 생성한다.
 
 ![](images/athena_partitioning.png)
 
@@ -56,7 +56,35 @@ Alter Table <tablename> add Partition (PARTITION_COLUMN_NAME = <VALUE>, PARTITIO
 예를 들면 아래와 같다.
 
 ```
-Alter Table debug_partitioned add Partition (year='2018', month='03', day='03') LOCATION ‘s3://hive-live-log/DEBUG/2018/03/03/
+Alter Table debug_partitioned add Partition (year=2018, month=3, day=3) LOCATION ‘s3://hive-live-log/DEBUG/2018/03/03/
+```
+
+
+
+## 쿼리
+
+쿼리 시에는 파티션 컬럼으로 지정한 값으로 범위를 지정해 주어야 파티셔닝이 적용된 쿼리가 수행된다.  먼저 파티션 설정이 되어 있지 않은 테이블에서의 쿼리를 살펴보자.
+
+```sql
+SELECT * FROM "hive_live"."trace" where timestamp between timestamp '2017-12-10 00:00:00.000' and timestamp '2017-12-11 00:00:00.000' order by timestamp desc limit 10;
+```
+
+hive_live라는 데이터베이스의 trace 테이블에서 쿼리를 수행하는데, 이 테이블은 trace 로그에 대한 모든 날짜에 대해 쿼리를 수행한다.  전체 파일을 대상으로 쿼리를 수행했기 때문에 스캔 한 파일의 크기가 굉장히 크고, 쿼리를 수행하는데 걸린 시간도 오래걸렸다.
+
+```
+(Run time: 32.07 seconds, Data scanned: 481.38GB) 
+```
+
+이제 파티션이 적용된 테이블에서 쿼리를 수행해보도록 하자. 동일한 쿼리를 아래와 같이 파티션 컬럼과 함께 수행한다.
+
+```sql
+SELECT * FROM "hive_live"."trace_partitioned" where timestamp between timestamp '2017-12-10 00:00:00.000' and timestamp '2017-12-11 00:00:00.000' and year = 2017 and month = 12 and day = 10 order by timestamp desc limit 10;
+```
+
+그러면 파티션 컬럼인 year, month, day에 의해 매핑되는 S3 버킷만을 참조하기 때문에 스캔 범위가 굉장히 축소된다. 이로 인해 비용도 줄일 수 있고 쿼리 시간도 단축시킬 수 있게 된다.
+
+```
+(Run time: 4.72 seconds, Data scanned: 3.84GB) 
 ```
 
 
