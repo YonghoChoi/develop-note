@@ -17,3 +17,61 @@
 
 
 
+## 디렉토리 구조
+
+* /etc/rundeck : Rundeck 서버의 설정 파일들
+  * 인증
+  * 프레임워크
+  * 서버 설정 등
+* /var/rundeck : Rundeck 프로젝트와 관련된 설정 파일들
+  * 프로젝트 자체의 설정 파일
+  * 노드 설정 파일
+  * 액세스 정책 등
+* /var/lib/rundeck : rundeck 웹 페이지를 구성하기 위한 파일들
+  * 정적 파일
+  * rundeck 웹을 통해 생성되는 각종 파일들 (job, command, log 등)
+
+
+
+## Rundeck 동작
+
+* 가장 큰 단위가 되는 프로젝트를 생성
+* 프로젝트 내에는 노드, 잡, 커맨드를 생성할 수 있는데, 원격 호스트가 노드에 해당하고 이 노드에서 실행할 명령이 잡과 커맨드로 구분된다.
+  * 이 때 노드는 GUI로 추가가 불가능하고 설정 파일을 수정해야한다.
+* 잡과 커맨드의 차이는 커맨드는 단일 실행 명령을 의미하고, 잡은 이러한 커맨드를 포함해서 다양한 유형의 동작을 스텝으로 구분해서 실행할 수 있다. 즉, 워크플로 설정이 가능하다.
+* 실행 순서를 정리해보면 먼저 프로젝트를 생성하고 노드를 추가한 후 노드에서 실행할 잡이나 커맨드를 생성한다.
+
+
+
+## 인증
+
+* Rundeck의 사용자 계정 관리는 `/etc/rundeck/realm.properties`에 정의
+
+* 사용자 계정 입력 형식
+
+  ```
+  admin:admin,user,admin
+  ```
+
+  * `<username>: <password>[,<rolename> ...]`
+  * 위의 경우 사용자 계정은 admin이고 패스워드는 admin, 계정에 대한 role은 user와 admin이다.
+
+* 패스워드를 암호화해서 입력하려면 `jetty-all-9.0.7.v20131107.jar` 를 실행해서 암호화된 문자열 생성
+
+  ```
+  $ java -cp /var/lib/rundeck/bootstrap/jetty-all-9.0.7.v20131107.jar org.eclipse.jetty.util.security.Password <username> <password>
+  ```
+
+  ```
+  OBF:1xfd1zt11uha1ugg1zsp1xfp
+  MD5:a029d0df84eb5549c641e04a9ef389e5
+  CRYPT:jsnDAc2Xk4W4o
+  ```
+
+* 위에서 생성한 암호 문자열을 사용하여 계정에 패스워드 지정
+
+  ```
+  <username>: MD5:a029d0df84eb5549c641e04a9ef389e5,user,admin
+  ```
+
+  
